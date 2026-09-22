@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte - Fluke Impulse 7000DP</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #ccc;
+            margin-bottom: 20px;
+        }
+        h1 { color: #0056b3; font-size: 24px; margin: 0; }
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        button:hover { background-color: #0056b3; }
+        button.secondary { background-color: #6c757d; }
+        button.secondary:hover { background-color: #5a6268; }
+        button.success { background-color: #28a745; }
+        button.success:hover { background-color: #218838; }
+        .status { font-weight: bold; font-size: 14px; }
+
+        /* Contenedor seguro para mantener los datos 100% originales sin alteraciones */
+        #reportContent {
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            white-space: pre-wrap; 
+            font-family: 'Consolas', 'Courier New', monospace; 
+            font-size: 13px;
+            color: #000;
+            line-height: 1.4;
+            overflow-x: auto;
+            min-height: 250px;
+        }
+
+        /* Estilo limpio para cuando generes el PDF o imprimas */
+        @media print {
+            body { background: #fff; margin: 0; padding: 0; }
+            header, .controls { display: none !important; }
+            #reportContent {
+                box-shadow: none;
+                border: none;
+                padding: 0;
+                margin: 0;
+                width: 100%;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Capturador Fluke Impulse 7000DP</h1>
+        <p class="status" id="statusText">Estado: Desconectado</p>
+    </header>
+
+    <div class="controls">
+        <button id="connectBtn">1. Conectar Puerto</button>
+        <button id="disconnectBtn" class="secondary" disabled>Desconectar</button>
+        <button id="clearBtn" class="secondary">Limpiar Pantalla</button>
+        <button id="printBtn" class="success" disabled>2. Generar PDF / Imprimir</button>
+    </div>
+
+    <div id="reportContent">Esperando conexión con el equipo médico...</div>
+
+    <script>
+        let port;
+        let reader;
+        let keepReading = false;
+        let reportBuffer = ""; // Almacena el texto crudo tal cual llega
+
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const printBtn = document.getElementById('printBtn');
+        const reportContentDiv = document.getElementById('reportContent');
+        const statusText = document.getElementById('statusText');
+
+        if (!('serial' in navigator)) {
+            alert('Tu navegador no soporta la Web Serial API. Utiliza Google Chrome o Microsoft Edge.');
+            connectBtn.disabled = true;
+        }
+
+        connectBtn.addEventListener('click', async () => {
+            try {
+                reportBuffer = "";
+                reportContentDiv.textContent = "Conexión establecida. Transfiere los datos desde el Impulse 7000DP...\n\n";
+                
+                port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 9600 });
+
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                printBtn.disabled = false;
+                statusText.textContent = 'Estado: Conectado y escuchando...';
+
+                keepReading = true;
+                readLoop();
+
+            } catch (error) {
+                console.error('Error al conectar:', error);
+                statusText.textContent = 'Estado: Error de conexión';
+            }
+        });
+
+        async function readLoop() {
+            const textDecoder = new TextDecoderStream();
+            port.readable.pipeTo(textDecoder.writable);
+            reader = textDecoder.readable.getReader();
+
+            try {
+                while (keepReading) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    if (value) {
+                        // Se acumulan los datos crudos exactamente como entran
+                        reportBuffer += value;
+                        reportContentDiv.textContent = reportBuffer;
+                        reportContentDiv.scrollTop = reportContentDiv.scrollHeight;
+                    }
+                }
+            } catch (error) {
+                console.error('Error durante la lectura:', error);
+            } finally {
+                reader.releaseLock();
+            }
+        }
+
+        disconnectBtn.addEventListener('click', async () => {
+            keepReading = false;
+            if (reader) await reader.cancel();
+            if (port) await port.close();
+
+            connectBtn.disabled = false;
+            connectBtn.disabled = true;
+            statusText.textContent = 'Estado: Desconectado';
+            reportContentDiv.textContent += '\n[Puerto cerrado]\n';
+        });
+
+        clearBtn.addEventListener('click', () => {
+            reportBuffer = "";
+            reportContentDiv.textContent = '';
+        });
+
+        printBtn.addEventListener('click', () => {
+            window.print();
+        });
+    </script>
+</body>
+</html>
