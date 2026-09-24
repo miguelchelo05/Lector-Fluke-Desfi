@@ -110,7 +110,7 @@
                 });
 
                 // Abrir puerto a 9600 baudios (ajusta a 115200 si tu equipo lo requiere)
-                await port.open({ baudRate: 9600 });
+                await port.open({ baudRate: 115200 });
 
                 lblEstado.textContent = "Conectado";
                 lblEstado.className = "status connected";
