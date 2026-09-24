@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -102,21 +102,21 @@
             }
 
             try {
-                // Solicitar puerto filtrando estrictamente por el chip FTDI del Fluke (VID y PID)
+                // Solicitar puerto filtrando por el chip FTDI del Fluke (VID y PID)
                 port = await navigator.serial.requestPort({
                     filters: [
                         { usbVendorId: 0x0403, usbProductId: 0x6001 }
                     ]
                 });
 
-                // Abrir puerto a 9600 baudios (ajusta a 115200 si tu equipo lo requiere)
+                // Abierto a 115200 baudios que es la velocidad que respondió el equipo
                 await port.open({ baudRate: 115200 });
 
                 lblEstado.textContent = "Conectado";
                 lblEstado.className = "status connected";
                 btnConectar.disabled = true;
                 btnDesconectar.disabled = false;
-                terminal.textContent = "Conexión establecida. Transfiere los datos desde el Impulse 7000DP...\n\n";
+                terminal.textContent = "Conexión establecida a 115200 baudios. Transfiere los datos desde el Impulse 7000DP...\n\n";
 
                 keepReading = true;
                 leerDatos();
@@ -140,9 +140,9 @@
                         break;
                     }
                     if (value) {
-                        // Imprime los datos exactamente como llegan, respetando espacios, saltos y formato crudo
+                        // Imprime los datos tal cual van llegando al puerto
                         terminal.textContent += value;
-                        terminal.scrollTop = terminal.scrollHeight; // Auto-scroll al final
+                        terminal.scrollTop = terminal.scrollHeight;
                     }
                 }
             } catch (error) {
@@ -180,7 +180,6 @@
         }
 
         function generarPDF() {
-            // Abre una ventana limpia con el contenido exacto en formato monospace listo para imprimir o guardar como PDF
             const contenido = terminal.textContent;
             const ventanaImpresion = window.open('', '', 'width=900,height=600');
             ventanaImpresion.document.write(`
