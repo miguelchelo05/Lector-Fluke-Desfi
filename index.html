@@ -1,317 +1,322 @@
 <!DOCTYPE html>
+<!-- Define que el documento es de tipo HTML5 -->
 <html lang="es">
+<!-- Abre la etiqueta raíz de la página web e indica que el idioma principal es español -->
 <head>
-    <!-- Define la codificación de caracteres como UTF-8 para soportar tildes y eñes -->
+<!-- Abre la sección de metadatos y configuración de la página -->
     <meta charset="UTF-8">
-    <!-- Hace que la página sea responsiva y se adapte a celulares y tablets -->
+    <!-- Configura la codificación de texto para que reconozca acentos y eñes correctamente -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Título que aparece en la pestaña del navegador -->
+    <!-- Hace que la página sea adaptable (responsiva) para celulares, tablets y computadoras -->
     <title>Capturador Fluke Impulse 7000DP</title>
+    <!-- Define el título que aparece en la pestaña superior del navegador web -->
     <style>
-        /* Variables globales de colores para mantener un diseño limpio y ordenado */
+        /* ========================================== */
+        /* COMENTARIOS CSS (Usan /* ... */ obligatoriamente) */
+        /* ========================================== */
+
+        /* Declara variables globales de colores para reutilizarlas en todo el diseño */
         :root {
-            --primary-color: #0F4C81; /* Azul institucional */
-            --secondary-color: #2575FC; /* Azul brillante */
-            --bg-color: #f0f4f8; /* Color de fondo general de la página */
-            --card-bg: #ffffff; /* Color de fondo de las tarjetas blancas */
-            --text-color: #333333; /* Color principal del texto */
-            --success: #28a745; /* Verde para estados conectados */
-            --danger: #dc3545; /* Rojo para desconectado o errores */
+            --primary-color: #0F4C81; /* Color azul principal de la aplicación */
+            --secondary-color: #2575FC; /* Color azul secundario más brillante */
+            --bg-color: #f0f4f8; /* Color de fondo general de la pantalla */
+            --card-bg: #ffffff; /* Color blanco para el contenedor principal de la tarjeta */
+            --text-color: #333333; /* Color oscuro estándar para las letras */
+            --success: #28a745; /* Color verde para indicar estados correctos o conectados */
+            --danger: #dc3545; /* Color rojo para indicar desconexión o errores */
         }
 
-        /* Estilos generales para el cuerpo de la página */
+        /* Reglas de diseño para todo el cuerpo de la página web */
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            margin: 0;
-            padding: 20px;
-            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; /* Selecciona la tipografía moderna */
+            background-color: var(--bg-color); /* Aplica el color de fondo general definido arriba */
+            margin: 0; /* Elimina los márgenes predeterminados del navegador */
+            padding: 20px; /* Agrega un espacio de relleno alrededor de toda la página */
+            color: var(--text-color); /* Establece el color principal del texto */
         }
 
-        /* Contenedor principal centrado que da forma a la tarjeta de la app */
+        /* Estilos para la caja blanca principal que contiene toda la app */
         .container {
-            max-width: 900px;
-            margin: 0 auto;
-            background: var(--card-bg);
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            max-width: 900px; /* Establece un ancho máximo para que no se estire demasiado */
+            margin: 0 auto; /* Centra el contenedor automáticamente en medio de la pantalla */
+            background: var(--card-bg); /* Pone el fondo de la caja de color blanco */
+            padding: 30px; /* Deja espacio interior para que los elementos no peguen con las orillas */
+            border-radius: 12px; /* Redondea las esquinas de la tarjeta principal */
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08); /* Añade una sombra suave alrededor de la caja */
         }
 
-        /* Encabezado que separa el título y el indicador de estado */
+        /* Estilos para la sección superior de la app */
         header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid #eef2f7;
-            padding-bottom: 15px;
-            margin-bottom: 20px;
+            display: flex; /* Convierte la cabecera en un contenedor flexible */
+            justify-content: space-between; /* Separa los elementos: título a la izquierda y estado a la derecha */
+            align-items: center; /* Centra verticalmente los elementos de la cabecera */
+            border-bottom: 2px solid #eef2f7; /* Dibuja una línea divisoria sutil abajo del encabezado */
+            padding-bottom: 15px; /* Deja espacio entre el contenido y la línea divisoria */
+            margin-bottom: 20px; /* Deja espacio separando la cabecera del resto del contenido */
         }
 
-        /* Estilo para el título principal de la aplicación */
+        /* Reglas de estilo para el título principal */
         h1 {
-            color: var(--primary-color);
-            font-size: 22px;
-            margin: 0;
+            color: var(--primary-color); /* Pone el texto del título con el color azul principal */
+            font-size: 22px; /* Define el tamaño de la letra del título */
+            margin: 0; /* Elimina cualquier margen extra */
         }
 
-        /* Insignia visual para mostrar si está conectado o no */
+        /* Estilos para la etiqueta visual de estado */
         .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 13px;
-            font-weight: 600;
+            display: inline-flex; /* Permite alinear el icono y el texto juntos de manera flexible */
+            align-items: center; /* Centra verticalmente el punto y el texto */
+            gap: 8px; /* Deja una pequeña separación entre el punto y el texto */
+            padding: 6px 14px; /* Relleno interior para que parezca una pastilla */
+            border-radius: 20px; /* Redondea completamente las esquinas de la pastilla */
+            font-size: 13px; /* Tamaño pequeño y limpio para el texto de estado */
+            font-weight: 600; /* Hace la letra un poco más gruesa (seminegrita) */
         }
 
-        /* Estilo cuando está desconectado (fondo rojo claro) */
+        /* Estilos especiales cuando el estado es desconectado */
         .status-badge.disconnected {
-            background-color: #f8d7da;
-            color: var(--danger);
+            background-color: #f8d7da; /* Fondo de color rojo muy claro */
+            color: var(--danger); /* Texto de color rojo fuerte para la advertencia */
         }
 
-        /* Estilo cuando está conectado (fondo verde claro) */
+        /* Estilos especiales cuando el estado es conectado con éxito */
         .status-badge.connected {
-            background-color: #d4edda;
-            color: var(--success);
+            background-color: #d4edda; /* Fondo de color verde muy claro */
+            color: var(--success); /* Texto de color verde fuerte para indicar éxito */
         }
 
-        /* Pequeño punto indicador dentro de la insignia */
+        /* Estilos para el pequeño punto indicador dentro de la etiqueta */
         .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: currentColor;
+            width: 8px; /* Ancho del punto */
+            height: 8px; /* Alto del punto */
+            border-radius: 50%; /* Vuelve el cuadrado en un círculo perfecto */
+            background-color: currentColor; /* Hereda automáticamente el color del texto de la etiqueta */
         }
 
-        /* Panel contenedor de los botones de control */
+        /* Panel donde se agrupan los botones de acción */
         .control-panel {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
+            background: #f8fafc; /* Fondo gris muy claro para diferenciar el panel */
+            border: 1px solid #e2e8f0; /* Borde sutil alrededor del panel */
+            padding: 15px; /* Espacio interior del panel */
+            border-radius: 8px; /* Redondea las esquinas del panel */
+            margin-bottom: 20px; /* Espacio inferior que separa el panel de la terminal */
+            display: flex; /* Alinea los botones de manera flexible */
+            gap: 12px; /* Espacio entre cada botón */
+            flex-wrap: wrap; /* Si la pantalla es pequeña, baja los botones al renglón siguiente */
         }
 
-        /* Estilos generales para todos los botones */
+        /* Estilos generales para todos los botones de la aplicación */
         button {
-            padding: 10px 18px;
-            font-size: 14px;
-            font-weight: 600;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            color: #fff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            padding: 10px 18px; /* Espacio interno para hacer los botones cómodos de presionar */
+            font-size: 14px; /* Tamaño del texto dentro del botón */
+            font-weight: 600; /* Letra seminegrita para mayor legibilidad */
+            border: none; /* Quita el borde predeterminado de los botones */
+            border-radius: 6px; /* Redondea ligeramente las esquinas */
+            cursor: pointer; /* Cambia el cursor a una manita al pasar el mouse */
+            transition: all 0.2s ease; /* Crea una animación suave al interactuar */
+            color: #fff; /* Color de texto blanco por defecto */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* Sombra muy ligera debajo del botón */
         }
 
-        /* Efecto al presionar un botón */
+        /* Efecto que ocurre justo al presionar el botón */
         button:active {
-            transform: translateY(1px);
+            transform: translateY(1px); /* Mueve el botón un píxel hacia abajo simulando que se hunde */
         }
 
-        /* Colores específicos para cada botón */
+        /* Estilo exclusivo y llamativo con degradado para el botón de conectar */
         #btnConectar { background: linear-gradient(135deg, #0061ff 0%, #60efff 100%); color: #000; }
+        /* Color gris formal para el botón de desconectar */
         #btnDesconectar { background-color: #64748b; }
+        /* Color gris claro para el botón de limpiar pantalla */
         #btnLimpiar { background-color: #94a3b8; }
+        /* Estilo con degradado verde brillante para el botón de PDF */
         #btnPdf { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: #fff; }
         
-        /* Apariencia de los botones cuando están desactivados (disabled) */
+        /* Reglas aplicadas únicamente cuando el botón está desactivado */
         button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none !important;
+            opacity: 0.5; /* Vuelve el botón semi-transparente */
+            cursor: not-allowed; /* Muestra un icono de prohibido al pasar el mouse */
+            transform: none !important; /* Anula cualquier efecto de movimiento */
         }
 
+        /* Contenedor general que envuelve a la consola de texto */
         .terminal-wrapper {
-            position: relative;
+            position: relative; /* Posicionamiento relativo */
         }
 
-        /* Etiqueta superior de la consola de texto */
+        /* Pequeño texto descriptivo arriba de la consola negra */
         .terminal-label {
-            font-size: 12px;
-            font-weight: 600;
-            color: #64748b;
-            margin-bottom: 6px;
-            display: block;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 12px; /* Letra pequeña */
+            font-weight: 600; /* Negrita ligera */
+            color: #64748b; /* Color gris medio */
+            margin-bottom: 6px; /* Espacio debajo de la etiqueta */
+            display: block; /* Ocupa toda su propia línea */
+            text-transform: uppercase; /* Vuelve todo el texto en MAYÚSCULAS */
+            letter-spacing: 0.5px; /* Separa ligeramente las letras */
         }
 
-        /* Pantalla tipo consola oscura donde aparecen los datos del Fluke */
+        /* Estilos de la pantalla negra tipo consola donde llegan los datos del equipo */
         #terminal {
-            width: 100%;
-            height: 420px;
-            background-color: #0f172a; /* Fondo estilo terminal de código */
-            color: #38ef7d; /* Texto verde brillante tipo matriz */
-            font-family: 'Fira Code', 'Courier New', Courier, monospace; /* Letra monoespaciada para alinear tablas */
-            font-size: 13px;
-            padding: 20px;
-            box-sizing: border-box;
-            border-radius: 8px;
-            white-space: pre-wrap; /* Respeta los espacios y saltos de línea originales del equipo */
-            overflow-y: auto; /* Permite barra deslizadora si el texto es muy largo */
-            word-break: break-all;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
-            border: 1px solid #334155;
+            width: 100%; /* Ocupa todo el ancho disponible */
+            height: 420px; /* Altura fija de la pantalla de la terminal */
+            background-color: #0f172a; /* Color de fondo azul obscuro profundo estilo consola */
+            color: #38ef7d; /* Color de texto verde brillante estilo matriz */
+            font-family: 'Fira Code', 'Courier New', Courier, monospace; /* Letra monoespaciada para alinear datos */
+            font-size: 13px; /* Tamaño del texto dentro de la consola */
+            padding: 20px; /* Margen interior para que el texto no pegue con los bordes */
+            box-sizing: border-box; /* Asegura que los márgenes internos no descuadren el ancho */
+            border-radius: 8px; /* Redondea las esquinas de la consola */
+            white-space: pre-wrap; /* Respeta estrictamente los espacios, tabulaciones y saltos de línea */
+            overflow-y: auto; /* Muestra una barra de desplazamiento vertical si el texto es muy largo */
+            word-break: break-all; /* Evita que palabras muy largas rompan el diseño */
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.4); /* Sombra interior para darle profundidad */
+            border: 1px solid #334155; /* Borde sutil alrededor de la consola */
         }
 
-        /* Pie de página informativo */
+        /* Estilos para el pie de página al fondo de la app */
         footer {
-            text-align: center;
-            margin-top: 25px;
-            font-size: 12px;
-            color: #94a3b8;
+            text-align: center; /* Centra el texto horizontalmente */
+            margin-top: 25px; /* Espacio superior que separa el pie de página */
+            font-size: 12px; /* Letra pequeña */
+            color: #94a3b8; /* Color gris tenue */
         }
     </style>
 </head>
+<!-- Cierra la cabecera y abre el cuerpo visible de la página web -->
 <body>
 
+    <!-- Abre el contenedor principal con la tarjeta blanca de la app -->
     <div class="container">
-        <!-- Encabezado visual de la app -->
+        <!-- Abre la sección del encabezado de la interfaz -->
         <header>
-            <h1>🫀 Capturador Fluke Impulse 7000DP</h1>
+            <h1>🫀 Capturador Fluke Impulse 7000DP</h1> <!-- Título principal con ícono de corazón -->
+            <!-- Insignia de estado que inicia con clase "disconnected" (roja) -->
             <div id="lblEstado" class="status-badge disconnected">
-                <span class="dot"></span>Desconectado
+                <span class="dot"></span>Desconectado <!-- Dibuja el punto y texto inicial -->
             </div>
         </header>
 
-        <!-- Panel con los botones de acción para el usuario -->
+        <!-- Abre el panel contenedor de los botones interactivos -->
         <div class="control-panel">
+            <!-- Botón para iniciar la conexión USB; ejecuta la función "conectarPuerto()" -->
             <button id="btnConectar" onclick="conectarPuerto()">1. Conectar Puerto</button>
+            <!-- Botón para cerrar la conexión; empieza desactivado (disabled) -->
             <button id="btnDesconectar" onclick="desconectarPuerto()" disabled>Desconectar</button>
+            <!-- Botón para borrar todo el texto de la terminal -->
             <button id="btnLimpiar" onclick="limpiarPantalla()">Limpiar Pantalla</button>
+            <!-- Botón para mandar a imprimir o guardar en PDF el contenido -->
             <button id="btnPdf" onclick="generarPDF()">2. Generar PDF / Imprimir</button>
         </div>
 
-        <!-- Pantalla de la terminal donde se imprimen los datos -->
+        <!-- Abre el contenedor que agrupa la etiqueta y la pantalla de la terminal -->
         <div class="terminal-wrapper">
-            <span class="terminal-label">Consola de Recepción de Datos</span>
-            <div id="terminal">Esperando conexión con el equipo Fluke...</div>
+            <span class="terminal-label">Consola de Recepción de Datos</span> <!-- Texto guía -->
+            <div id="terminal">Esperando conexión con el equipo Fluke...</div> <!-- Pantalla negra de texto -->
         </div>
 
-        <!-- Pie de página -->
+        <!-- Abre el pie de página institucional -->
         <footer>
             Sistema de Adquisición de Datos Biomédicos | UVM
         </footer>
     </div>
 
+    <!-- Abre la sección de programación en lenguaje JavaScript -->
     <script>
-        // Variables globales para controlar la conexión serial y la lectura de datos
-        let port;
-        let reader;
-        let inputStreamClosed;
-        let keepReading = false;
+        let port; /* Variable global para almacenar el objeto del puerto serial físico */
+        let reader; /* Variable global para controlar el lector de datos continuos */
+        let inputStreamClosed; /* Variable global para manejar el cierre seguro del flujo */
+        let keepReading = false; /* Bandera booleana para saber si debemos seguir leyendo datos */
 
-        // Referencias a elementos del HTML para manipularlos con JavaScript
-        const terminal = document.getElementById('terminal');
-        const lblEstado = document.getElementById('lblEstado');
-        const btnConectar = document.getElementById('btnConectar');
-        const btnDesconectar = document.getElementById('btnDesconectar');
+        const terminal = document.getElementById('terminal'); /* Referencia a la consola negra */
+        const lblEstado = document.getElementById('lblEstado'); /* Referencia a la etiqueta de estado */
+        const btnConectar = document.getElementById('btnConectar'); /* Referencia al botón conectar */
+        const btnDesconectar = document.getElementById('btnDesconectar'); /* Referencia al botón desconectar */
 
-        // Función asíncrona que se ejecuta al hacer clic en "Conectar Puerto"
+        /* Define una función asíncrona que se ejecuta cuando el usuario hace clic en conectar */
         async function conectarPuerto() {
-            // Revisa si el navegador soporta la tecnología Web Serial API
+            /* Revisa si el navegador actual soporta la Web Serial API (Chrome/Edge) */
             if (!("serial" in navigator)) {
                 alert("Tu navegador no soporta la Web Serial API. Usa Google Chrome o Edge.");
-                return;
+                return; /* Detiene la ejecución si no hay soporte */
             }
 
             try {
-                // Solicita al usuario seleccionar el dispositivo USB filtrando por el chip FTDI del Fluke
+                /* Abre la ventana del navegador para que el usuario elija el dispositivo USB */
                 port = await navigator.serial.requestPort({
                     filters: [
-                        { usbVendorId: 0x0403, usbProductId: 0x6001 }
+                        { usbVendorId: 0x0403, usbProductId: 0x6001 } /* Filtra el chip FTDI del Fluke */
                     ]
                 });
 
-                // Abre el puerto de comunicación serial configurado exactamente a 115200 baudios
+                /* Abre el puerto serial seleccionado a una velocidad de 115200 baudios */
                 await port.open({ baudRate: 115200 });
 
-                // Actualiza los elementos visuales de la interfaz a estado "Conectado"
-                lblEstado.innerHTML = '<span class="dot"></span>Conectado';
-                lblEstado.className = "status-badge connected";
-                btnConectar.disabled = true;
-                btnDesconectar.disabled = false;
-                terminal.textContent = "Conexión establecida a 115200 baudios. Transfiere los datos desde el Impulse 7000DP...\n\n";
+                lblEstado.innerHTML = '<span class="dot"></span>Conectado'; /* Cambia texto a Conectado */
+                lblEstado.className = "status-badge connected"; /* Pinta la etiqueta de verde */
+                btnConectar.disabled = true; /* Desactiva el botón de conectar */
+                btnDesconectar.disabled = false; /* Habilita el botón de desconectar */
+                terminal.textContent = "Conexión establecida a 115200 baudios. Transfiere los datos desde el Impulse 7000DP...\n\n"; /* Mensaje de éxito */
 
-                // Activa la bandera de lectura y manda llamar la función que escucha el puerto
-                keepReading = true;
-                leerDatos();
+                keepReading = true; /* Activa la bandera para comenzar a escuchar datos */
+                leerDatos(); /* Llama a la función que escucha el puerto continuamente */
 
             } catch (error) {
-                console.error("Error al conectar:", error);
-                lblEstado.innerHTML = '<span class="dot"></span>Error de conexión';
-                lblEstado.className = "status-badge disconnected";
+                console.error("Error al conectar:", error); /* Registra el error en consola de depuración */
+                lblEstado.innerHTML = '<span class="dot"></span>Error de conexión'; /* Mensaje de error visual */
+                lblEstado.className = "status-badge disconnected"; /* Pinta la etiqueta de rojo */
             }
         }
 
-        // Función encargada de escuchar continuamente la llegada de datos desde el equipo físico
+        /* Define una función continua para escuchar la información que llega por el puerto */
         async function leerDatos() {
-            const textDecoder = new TextDecoderStream();
-            inputStreamClosed = port.readable.pipeTo(textDecoder.writable);
-            reader = textDecoder.readable.getReader();
+            const textDecoder = new TextDecoderStream(); /* Crea decodificador de bytes a texto legible */
+            inputStreamClosed = port.readable.pipeTo(textDecoder.writable); /* Conecta el puerto con el decodificador */
+            reader = textDecoder.readable.getReader(); /* Obtiene el lector listo para extraer texto */
 
             try {
-                // Bucle que se mantiene activo mientras "keepReading" sea verdadero
+                /* Bucle que se mantiene activo mientras keepReading sea verdadero */
                 while (keepReading) {
-                    const { value, done } = await reader.read();
-                    if (done) {
-                        break; // Sale del ciclo si la lectura termina
-                    }
+                    const { value, done } = await reader.read(); /* Lee los datos actuales de forma asíncrona */
+                    if (done) break; /* Rompe el ciclo si la lectura termina */
                     if (value) {
-                        // Agrega el texto recibido a la pantalla de la terminal y hace scroll automático al final
-                        terminal.textContent += value;
-                        terminal.scrollTop = terminal.scrollHeight;
+                        terminal.textContent += value; /* Añade el texto recibido al final de la terminal */
+                        terminal.scrollTop = terminal.scrollHeight; /* Desplaza la vista automáticamente hacia abajo */
                     }
                 }
             } catch (error) {
-                console.error("Error durante la lectura:", error);
+                console.error("Error durante la lectura:", error); /* Captura errores de lectura */
             } finally {
-                reader.releaseLock(); // Libera el lector de datos de forma segura
+                reader.releaseLock(); /* Libera el lector del puerto de forma segura */
             }
         }
 
-        // Función para cerrar la conexión con el puerto USB de manera ordenada
+        /* Define la función para cerrar la comunicación de forma ordenada */
         async function desconectarPuerto() {
-            keepReading = false;
+            keepReading = false; /* Pone la bandera en falso para detener el bucle de lectura */
             try {
-                if (reader) {
-                    await reader.cancel();
-                }
-                if (inputStreamClosed) {
-                    await inputStreamClosed.catch(() => {});
-                }
-                if (port) {
-                    await port.close();
-                }
+                if (reader) await reader.cancel(); /* Cancela la lectura actual si existe */
+                if (inputStreamClosed) await inputStreamClosed.catch(() => {}); /* Cierra el flujo de entrada */
+                if (port) await port.close(); /* Cierra formalmente la conexión USB */
             } catch (error) {
-                console.error("Error al cerrar el puerto:", error);
+                console.error("Error al cerrar el puerto:", error); /* Registra errores al cerrar */
             }
 
-            // Restablece la interfaz gráfica al estado "Desconectado"
-            lblEstado.innerHTML = '<span class="dot"></span>Desconectado';
-            lblEstado.className = "status-badge disconnected";
-            btnConectar.disabled = false;
-            btnDesconectar.disabled = true;
-            terminal.textContent += "\n[Puerto desconectado]";
+            lblEstado.innerHTML = '<span class="dot"></span>Desconectado'; /* Restablece estado visual */
+            lblEstado.className = "status-badge disconnected"; /* Pinta la etiqueta de rojo */
+            btnConectar.disabled = false; /* Habilita de nuevo el botón de conectar */
+            btnDesconectar.disabled = true; /* Desactiva el botón de desconectar */
+            terminal.textContent += "\n[Puerto desconectado]"; /* Añade aviso en la terminal */
         }
 
-        // Limpia todo el contenido de texto que hay dentro de la terminal
+        /* Define una función simple para vaciar la consola de texto */
         function limpiarPantalla() {
-            terminal.textContent = "";
+            terminal.textContent = ""; /* Borra todo el texto de la terminal */
         }
 
-        // Abre una ventana emergente limpia para imprimir o guardar el reporte en PDF
+        /* Define una función para preparar y mandar a imprimir o guardar como PDF */
         function generarPDF() {
-            const contenido = terminal.textContent;
-            const ventanaImpresion = window.open('', '', 'width=900,height=600');
+            const contenido = terminal.textContent; /* Copia todo el texto actual de la terminal */
+            const ventanaImpresion = window.open('', '', 'width=900,height=600'); /* Abre una ventana emergente limpia */
             ventanaImpresion.document.write(`
                 <html>
                     <head>
@@ -325,14 +330,15 @@
                         <h2>Reporte de Calibración - Fluke Impulse 7000DP</h2>
                         <div>${contenido}</div>
                         <script>
-                            // Dispara automáticamente el diálogo de impresión del navegador al cargar la ventana
-                            window.onload = function() { window.print(); }
+                            window.onload = function() { window.print(); } /* Lanza el diálogo de impresión automático */
                         <\/script>
                     </body>
                 </html>
             `);
-            ventanaImpresion.document.close();
+            ventanaImpresion.document.close(); /* Cierra el flujo de escritura del documento */
         }
     </script>
+</body>
+</html>
 </body>
 </html>
