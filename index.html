@@ -13,235 +13,416 @@
     <style>
         /* Estilos generales para todo el cuerpo de la página */
         body {
-            font-family: Arial, sans-serif; /* Tipo de letra limpio y legible */
-            background-color: #f4f6f9; /* Color de fondo gris claro */
-            margin: 0; /* Elimina márgenes por defecto del navegador */
-            padding: 20px; /* Agrega espacio interno alrededor de la página */
-            color: #333; /* Color de texto gris oscuro para lectura cómoda */
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+            color: #333;
         }
-        /* Estilos para la tarjeta central blanca que contiene todo el contenido */
+        /* Contenedor principal de la tarjeta central */
         .container {
-            max-width: 800px; /* Ancho máximo de la tarjeta */
-            margin: 0 auto; /* Centra la tarjeta horizontalmente */
-            background: #fff; /* Fondo blanco */
-            padding: 20px; /* Espacio interno dentro de la tarjeta */
-            border-radius: 8px; /* Redondea las esquinas de la tarjeta */
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1); /* Agrega una sombra sutil de profundidad */
+            max-width: 850px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        /* Estilos para el título principal */
+        /* Estilos para la sección opcional de inicio de sesión */
+        #authSection {
+            background: #e2e8f0;
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
         h1 {
-            color: #003366; /* Color azul institucional */
-            font-size: 24px; /* Tamaño del texto del título */
+            color: #003366;
+            font-size: 24px;
         }
-        /* Estilos para el texto de estado de conexión */
         .status {
-            font-weight: bold; /* Hace el texto en negrita */
-            margin-bottom: 15px; /* Espacio de separación hacia abajo */
+            font-weight: bold;
+            margin-bottom: 15px;
         }
-        /* Color rojo cuando está desconectado */
         .status.disconnected { color: #d9534f; }
-        /* Color verde cuando está conectado exitosamente */
         .status.connected { color: #5cb85c; }
-        /* Contenedor flexible para alinear los botones en fila y ordenados */
+        /* Caja para la fecha de calibración persistente */
+        .calibration-box {
+            background-color: #e9ecef;
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .calibration-box input, input[type="text"] {
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
         .buttons {
-            display: flex; /* Activa el diseño flexible */
-            gap: 10px; /* Espacio entre cada botón */
-            flex-wrap: wrap; /* Permite que bajen de renglón si la pantalla es muy chica */
-            margin-bottom: 20px; /* Margen inferior */
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
         }
-        /* Estilos generales para todos los botones */
         button {
-            padding: 10px 15px; /* Espaciado interno del botón */
-            font-size: 14px; /* Tamaño del texto del botón */
-            font-weight: bold; /* Texto en negrita */
-            border: none; /* Sin bordes marcados */
-            border-radius: 4px; /* Esquinas ligeramente redondeadas */
-            cursor: pointer; /* Cambia el cursor a manita al pasar por encima */
-            color: #fff; /* Texto blanco en los botones */
+            padding: 10px 15px;
+            font-size: 14px;
+            font-weight: bold;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            color: #fff;
         }
-        /* Color específico azul para el botón de conectar */
         #btnConectar { background-color: #007bff; }
-        /* Color gris para el botón de desconectar */
         #btnDesconectar { background-color: #6c757d; }
-        /* Color gris para el botón de limpiar pantalla */
         #btnLimpiar { background-color: #6c757d; }
-        /* Color verde para el botón de generar PDF */
         #btnPdf { background-color: #28a745; }
-        /* Efecto visual cuando pones elmouse encima de cualquier botón */
+        #btnLogin { background-color: #17a2b8; }
+        #btnLogout { background-color: #dc3545; }
+        #btnHistorial { background-color: #ffc107; color: #333; }
         button:hover { opacity: 0.9; }
         
-        /* Estilos de la "terminal" o pantalla negra donde aparecen los datos del Fluke */
+        /* Terminal de visualización de datos */
         #terminal {
-            width: 100%; /* Ocupa todo el ancho disponible */
-            height: 400px; /* Altura fija de la pantalla negra */
-            background-color: #1e1e1e; /* Fondo negro estilo consola de programación */
-            color: #00ff00; /* Letras color verde brillante estilo hacker */
-            font-family: 'Courier New', Courier, monospace; /* Letra tipo máquina de escribir para alinear datos */
-            font-size: 13px; /* Tamaño de letra compacto */
-            padding: 15px; /* Espaciado interno para que el texto no pegue a las orillas */
-            box-sizing: border-box; /* Incluye el padding dentro del cálculo del ancho total */
-            border-radius: 4px; /* Esquinas redondeadas de la terminal */
-            white-space: pre-wrap; /* Respeta saltos de línea y espacios exactos que manda el equipo */
-            overflow-y: auto; /* Muestra barra de desplazamiento vertical si hay mucho texto */
-            word-break: break-all; /* Corta palabras muy largas para que no salgan de la pantalla */
+            width: 100%;
+            height: 300px;
+            background-color: #1e1e1e;
+            color: #00ff00;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 13px;
+            padding: 15px;
+            box-sizing: border-box;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            overflow-y: auto;
+            word-break: break-all;
+            margin-bottom: 15px;
+        }
+        /* Sección de historial de pruebas guardadas */
+        #historySection {
+            margin-top: 20px;
+            border-top: 2px solid #ddd;
+            padding-top: 15px;
+            display: none; /* Se muestra solo si el usuario inicia sesión */
+        }
+        .history-item {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            border-left: 4px solid #007bff;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
     </style>
 </head>
 <body>
 
-    <!-- Tarjeta principal de la interfaz -->
     <div class="container">
-        <!-- Título visible en la página -->
-        <h1>Capturador Fluke Impulse 7000DP</h1>
-        <!-- Texto indicador del estado actual de la conexión -->
-        <div class="status">Estado: <span id="lblEstado" class="status disconnected">Desconectado</span></div>
-
-        <!-- Sección que agrupa los botones interactivos -->
-        <div class="buttons">
-            <!-- Botón 1: Llama a la función conectarPuerto al hacer clic -->
-            <button id="btnConectar" onclick="conectarPuerto()">1. Conectar Puerto</button>
-            <!-- Botón 2: Llama a desconectarPuerto y empieza desactivado (disabled) -->
-            <button id="btnDesconectar" onclick="desconectarPuerto()" disabled>Desconectar</button>
-            <!-- Botón 3: Borra todo el texto acumulado en la pantalla -->
-            <button id="btnLimpiar" onclick="limpiarPantalla()">Limpiar Pantalla</button>
-            <!-- Botón 4: Abre la ventana para exportar a PDF o imprimir -->
-            <button id="btnPdf" onclick="generarPDF()">2. Generar PDF / Imprimir</button>
+        <!-- SECCIÓN OPCIONAL DE INICIO DE SESIÓN -->
+        <div id="authSection">
+            <div>
+                👤 <strong>Modo Usuario:</strong> <span id="lblUsuario">Invitado (Opcional)</span>
+            </div>
+            <div id="loginForm">
+                <input type="text" id="txtUser" placeholder="Tu nombre (para guardar historial)..." />
+                <button id="btnLogin" onclick="iniciarSesion()">Identificarme</button>
+            </div>
+            <div id="logoutForm" style="display: none;">
+                <button id="btnLogout" onclick="cerrarSesion()">Cambiar / Salir</button>
+            </div>
         </div>
 
-        <!-- Pantalla negra de texto donde se imprimirán los reportes del Fluke -->
-        <div id="terminal">Esperando conexión con el equipo Fluke...</div>
+        <!-- APLICACIÓN PRINCIPAL (Siempre visible y disponible de inmediato) -->
+        <div id="appSection">
+            <h1>Capturador Fluke Impulse 7000DP</h1>
+            <div class="status">Estado: <span id="lblEstado" class="status disconnected">Desconectado</span></div>
+
+            <!-- Caja con la fecha de calibración fija en el navegador -->
+            <div class="calibration-box">
+                <label for="txtCalibDate">📅 Fecha de Calibración del Fluke (Guardada automáticamente):</label>
+                <input type="date" id="txtCalibDate" onchange="guardarFechaCalibracion()">
+            </div>
+
+            <div class="buttons">
+                <button id="btnConectar" onclick="conectarPuerto()">1. Conectar Puerto</button>
+                <button id="btnDesconectar" onclick="desconectarPuerto()" disabled>Desconectar</button>
+                <button id="btnLimpiar" onclick="limpiarPantalla()">Limpiar Pantalla</button>
+                <button id="btnPdf" onclick="generarPDF()">2. Generar PDF / Imprimir</button>
+                <button id="btnHistorial" onclick="guardarPruebaActual()" style="display: none;" id="btnGuardarHistorial">💾 Guardar en Historial</button>
+            </div>
+
+            <div id="terminal">Esperando conexión con el equipo Fluke...</div>
+
+            <!-- HISTORIAL DE PRUEBAS GUARDADAS (Opcional) -->
+            <div id="historySection">
+                <h3>📁 Historial de Pruebas Guardadas</h3>
+                <div id="listaHistorial">No hay pruebas guardadas aún.</div>
+            </div>
+        </div>
     </div>
 
-    <!-- Sección de código en JavaScript para dar funcionalidad a la página -->
+    <!-- CÓDIGO JAVASCRIPT -->
     <script>
-        let port; // Variable global para guardar la referencia del puerto USB conectado
-        let reader; // Variable para leer el flujo de datos que entran
-        let inputStreamClosed; // Variable para controlar el cierre seguro del flujo de entrada
-        let keepReading = false; // Bandera booleana (verdadero/falso) para saber si debemos seguir escuchando el puerto
+        let port;
+        let reader;
+        let inputStreamClosed;
+        let keepReading = false;
 
-        // Guardamos en constantes los elementos HTML para manipularlos fácilmente desde JavaScript
         const terminal = document.getElementById('terminal');
         const lblEstado = document.getElementById('lblEstado');
         const btnConectar = document.getElementById('btnConectar');
         const btnDesconectar = document.getElementById('btnDesconectar');
+        const txtCalibDate = document.getElementById('txtCalibDate');
+        const loginForm = document.getElementById('loginForm');
+        const logoutForm = document.getElementById('logoutForm');
+        const lblUsuario = document.getElementById('lblUsuario');
+        const txtUser = document.getElementById('txtUser');
+        const historySection = document.getElementById('historySection');
+        const listaHistorial = document.getElementById('listaHistorial');
+        const btnGuardarHistorial = document.getElementById('btnHistorial');
 
-        // Función asíncrona que se ejecuta al hacer clic en "Conectar Puerto"
+        // Al cargar la página, revisa si hay fecha guardada o si el usuario ya se había identificado antes
+        window.onload = function() {
+            const fechaGuardada = localStorage.getItem("fluke_fecha_calibracion");
+            if (fechaGuardada) {
+                txtCalibDate.value = fechaGuardada;
+            } else {
+                txtCalibDate.value = "2026-01-15"; // Fecha predeterminada
+            }
+
+            const usuarioGuardado = localStorage.getItem("fluke_usuario");
+            if (usuarioGuardado) {
+                activarSesion(usuarioGuardado);
+            }
+        };
+
+        // Función para identificarse opcionalmente
+        function iniciarSesion() {
+            const nombre = txtUser.value.trim();
+            if (nombre === "") {
+                alert("Por favor ingresa un nombre válido.");
+                return;
+            }
+            localStorage.setItem("fluke_usuario", nombre);
+            activarSesion(nombre);
+        }
+
+        // Activa las opciones de historial al identificarse
+        function activarSesion(nombre) {
+            lblUsuario.textContent = nombre;
+            loginForm.style.display = "none";
+            logoutForm.style.display = "block";
+            historySection.style.display = "block";
+            btnGuardarHistorial.style.display = "inline-block";
+            cargarHistorial();
+        }
+
+        // Quita la identificación activa
+        function cerrarSesion() {
+            localStorage.removeItem("fluke_usuario");
+            lblUsuario.textContent = "Invitado (Opcional)";
+            loginForm.style.display = "block";
+            logoutForm.style.display = "none";
+            historySection.style.display = "none";
+            btnGuardarHistorial.style.display = "none";
+        }
+
+        // Guarda permanentemente la fecha de calibración en el navegador
+        function guardarFechaCalibracion() {
+            localStorage.setItem("fluke_fecha_calibracion", txtCalibDate.value);
+        }
+
+        // Función para conectar el puerto serial del Fluke
         async function conectarPuerto() {
-            // Revisa si el navegador web es compatible con la tecnología Web Serial API
             if (!("serial" in navigator)) {
                 alert("Tu navegador no soporta la Web Serial API. Usa Google Chrome o Edge.");
-                return; // Detiene la ejecución si no es compatible
+                return;
             }
 
             try {
-                // Abre la ventanita del navegador para elegir dispositivo, filtrando exclusivamente por el chip FTDI del Fluke
                 port = await navigator.serial.requestPort({
-                    filters: [
-                        { usbVendorId: 0x0403, usbProductId: 0x6001 }
-                    ]
+                    filters: [{ usbVendorId: 0x0403, usbProductId: 0x6001 }]
                 });
 
-                // Abre formalmente la comunicación serial configurando la velocidad exacta a 115200 baudios
                 await port.open({ baudRate: 115200 });
 
-                // Cambia el texto y color del estado a verde indicando éxito
                 lblEstado.textContent = "Conectado";
                 lblEstado.className = "status connected";
-                // Desactiva el botón de conectar y activa el de desconectar
                 btnConectar.disabled = true;
                 btnDesconectar.disabled = false;
-                // Muestra un mensaje inicial dentro de la pantalla negra
                 terminal.textContent = "Conexión establecida a 115200 baudios. Transfiere los datos desde el Impulse 7000DP...\n\n";
 
-                keepReading = true; // Activa la bandera de lectura continua
-                leerDatos(); // Llama a la función que se queda escuchando los datos que llegan
-
+                keepReading = true;
+                leerDatos();
             } catch (error) {
-                // Si el usuario cancela la ventana o ocurre un fallo, lo atrapa aquí
                 console.error("Error al conectar:", error);
                 lblEstado.textContent = "Error de conexión";
                 lblEstado.className = "status disconnected";
             }
         }
 
-        // Función asíncrona encargada de escuchar y capturar en bucle los datos del puerto
+        // Lee los datos en tiempo real de la terminal
         async function leerDatos() {
-            const textDecoder = new TextDecoderStream(); // Crea un conversor de bytes crudos a texto legible
-            inputStreamClosed = port.readable.pipeTo(textDecoder.writable); // Conecta la lectura del puerto al conversor de texto
-            reader = textDecoder.readable.getReader(); // Obtiene el lector de texto
+            const textDecoder = new TextDecoderStream();
+            inputStreamClosed = port.readable.pipeTo(textDecoder.writable);
+            reader = textDecoder.readable.getReader();
 
             try {
-                // Bucle repetitivo que corre mientras 'keepReading' sea verdadero
                 while (keepReading) {
-                    const { value, done } = await reader.read(); // Lee el siguiente bloque de datos que mandó el Fluke
-                    if (done) {
-                        break; // Si el flujo terminó, rompe el bucle
-                    }
+                    const { value, done } = await reader.read();
+                    if (done) break;
                     if (value) {
-                        // Concatena el texto nuevo que va llegando a lo que ya estaba en la terminal
                         terminal.textContent += value;
-                        terminal.scrollTop = terminal.scrollHeight; // Hace scroll automático hacia abajo para ver lo más reciente
+                        terminal.scrollTop = terminal.scrollHeight;
                     }
                 }
             } catch (error) {
-                console.error("Error durante la lectura:", error); // Muestra errores en la consola si los hay
+                console.error("Error durante la lectura:", error);
             } finally {
-                reader.releaseLock(); // Libera el lector de forma segura al terminar
+                reader.releaseLock();
             }
         }
 
-        // Función que se ejecuta al hacer clic en "Desconectar"
+        // Desconecta el puerto de forma segura
         async function desconectarPuerto() {
-            keepReading = false; // Apaga la bandera para detener el bucle de lectura
+            keepReading = false;
             try {
-                if (reader) {
-                    await reader.cancel(); // Cancela la lectura activa
-                }
-                if (inputStreamClosed) {
-                    await inputStreamClosed.catch(() => {}); // Cierra el flujo de entrada
-                }
-                if (port) {
-                    await port.close(); // Cierra físicamente el puerto serial
-                }
+                if (reader) await reader.cancel();
+                if (inputStreamClosed) await inputStreamClosed.catch(() => {});
+                if (port) await port.close();
             } catch (error) {
                 console.error("Error al cerrar el puerto:", error);
             }
 
-            // Restaura el estado visual a "Desconectado" y conmuta los botones
             lblEstado.textContent = "Desconectado";
             lblEstado.className = "status disconnected";
             btnConectar.disabled = false;
             btnDesconectar.disabled = true;
-            terminal.textContent += "\n[Puerto desconectado]"; // Informa en la terminal
+            terminal.textContent += "\n[Puerto desconectado]";
         }
 
-        // Función simple para vaciar el texto de la terminal negra
         function limpiarPantalla() {
             terminal.textContent = "";
         }
 
-        // Función que prepara y abre una ventana emergente para imprimir o guardar como PDF
+        // Guarda la prueba actual en el historial local (solo si se ha identificado)
+        function guardarPruebaActual() {
+            const contenido = terminal.textContent.trim();
+            if (!contenido || contenido.includes("Esperando conexión")) {
+                alert("No hay datos válidos en la terminal para guardar.");
+                return;
+            }
+
+            const usuarioActual = localStorage.getItem("fluke_usuario") || "Invitado";
+            const fechaHora = new Date().toLocaleString();
+            
+            const nuevaPrueba = {
+                id: Date.now(),
+                usuario: usuarioActual,
+                fecha: fechaHora,
+                datos: contenido
+            };
+
+            let historial = JSON.parse(localStorage.getItem("fluke_historial") || "[]");
+            historial.unshift(nuevaPrueba);
+            localStorage.setItem("fluke_historial", JSON.stringify(historial));
+
+            cargarHistorial();
+            alert("¡Prueba guardada en el historial!");
+        }
+
+        // Carga y muestra el historial de pruebas del usuario
+        function cargarHistorial() {
+            let historial = JSON.parse(localStorage.getItem("fluke_historial") || "[]");
+            const usuarioActual = localStorage.getItem("fluke_usuario");
+            const misPruebas = historial.filter(p => p.usuario === usuarioActual);
+
+            if (misPruebas.length === 0) {
+                listaHistorial.innerHTML = "No hay pruebas guardadas para este usuario.";
+                return;
+            }
+
+            let html = "";
+            misPruebas.forEach(p => {
+                html += `
+                    <div class="history-item">
+                        <span>🕒 <strong>${p.fecha}</strong></span>
+                        <div>
+                            <button onclick="cargarPruebaEnTerminal(${p.id})" style="background-color: #007bff; padding: 5px 10px; font-size: 12px;">Cargar</button>
+                            <button onclick="eliminarPrueba(${p.id})" style="background-color: #dc3545; padding: 5px 10px; font-size: 12px;">Eliminar</button>
+                        </div>
+                    </div>
+                `;
+            });
+            listaHistorial.innerHTML = html;
+        }
+
+        function cargarPruebaEnTerminal(id) {
+            let historial = JSON.parse(localStorage.getItem("fluke_historial") || "[]");
+            const prueba = historial.find(p => p.id === id);
+            if (prueba) {
+                terminal.textContent = prueba.datos;
+                alert("Prueba cargada en la terminal.");
+            }
+        }
+
+        function eliminarPrueba(id) {
+            let historial = JSON.parse(localStorage.getItem("fluke_historial") || "[]");
+            historial = historial.filter(p => p.id !== id);
+            localStorage.setItem("fluke_historial", JSON.stringify(historial));
+            cargarHistorial();
+        }
+
+        // Genera el PDF incluyendo la fecha metrológica automática
         function generarPDF() {
-            const contenido = terminal.textContent; // Toma todo el texto acumulado en la pantalla negra
-            const ventanaImpresion = window.open('', '', 'width=900,height=600'); // Abre una nueva ventana limpia en el navegador
-            // Escribe la estructura HTML básica dentro de esa nueva ventana con el reporte
+            const contenido = terminal.textContent;
+            const fechaCalibracion = txtCalibDate.value || "No especificada";
+            const fechaActual = new Date().toLocaleString();
+            const usuarioActual = localStorage.getItem("fluke_usuario") || "Técnico General";
+
+            const ventanaImpresion = window.open('', '', 'width=900,height=700');
             ventanaImpresion.document.write(`
                 <html>
                     <head>
                         <title>Reporte Fluke Impulse 7000DP</title>
                         <style>
-                            body { font-family: 'Courier New', Courier, monospace; white-space: pre-wrap; padding: 20px; font-size: 12px; }
+                            body { font-family: 'Courier New', Courier, monospace; padding: 20px; font-size: 12px; display: flex; flex-direction: column; min-height: 90vh; }
+                            .header-info { margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+                            .report-body { flex: 1; white-space: pre-wrap; }
+                            .footer { margin-top: 30px; border-top: 1px solid #333; padding-top: 10px; font-size: 11px; color: #555; }
                         </style>
                     </head>
                     <body>
-                        ${contenido}
+                        <div class="header-info">
+                            <strong>INGENIERÍA CLÍNICA - REPORTE DE PRUEBA</strong><br>
+                            Técnico / Evaluador: <strong>${usuarioActual}</strong>
+                        </div>
+                        <div class="report-body">${contenido}</div>
+                        <div class="footer">
+                            <strong>INFORMACIÓN METROLÓGICA DEL EQUIPO PATRÓN:</strong><br>
+                            Analizador de Desfibrilador: Fluke Biomedical Impulse 7000DP<br>
+                            Fecha de Última Calibración del Patrón: <strong>${fechaCalibracion}</strong><br>
+                            Fecha de Emisión del Reporte: ${fechaActual}
+                        </div>
                         <script>
-                            window.onload = function() { window.print(); } // Dispara automáticamente la ventana de impresión del navegador
+                            window.onload = function() { window.print(); }
                         <\/script>
                     </body>
                 </html>
             `);
-            ventanaImpresion.document.close(); // Cierra el flujo de escritura del documento temporal
+            ventanaImpresion.document.close();
         }
     </script>
 </body>
