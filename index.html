@@ -1,87 +1,181 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Capturador Fluke Impulse 7000DP</title>
     <style>
+        :root {
+            --primary-color: #0F4C81;
+            --secondary-color: #2575FC;
+            --bg-color: #f0f4f8;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --success: #28a745;
+            --danger: #dc3545;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
             margin: 0;
             padding: 20px;
-            color: #333;
+            color: var(--text-color);
         }
+
         .container {
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
-            background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
         }
-        h1 {
-            color: #003366;
-            font-size: 24px;
-        }
-        .status {
-            font-weight: bold;
-            margin-bottom: 15px;
-        }
-        .status.disconnected { color: #d9534f; }
-        .status.connected { color: #5cb85c; }
-        .buttons {
+
+        header {
             display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #eef2f7;
+            padding-bottom: 15px;
             margin-bottom: 20px;
         }
-        button {
-            padding: 10px 15px;
-            font-size: 14px;
-            font-weight: bold;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            color: #fff;
+
+        h1 {
+            color: var(--primary-color);
+            font-size: 22px;
+            margin: 0;
         }
-        #btnConectar { background-color: #007bff; }
-        #btnDesconectar { background-color: #6c757d; }
-        #btnLimpiar { background-color: #6c757d; }
-        #btnPdf { background-color: #28a745; }
-        button:hover { opacity: 0.9; }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .status-badge.disconnected {
+            background-color: #f8d7da;
+            color: var(--danger);
+        }
+
+        .status-badge.connected {
+            background-color: #d4edda;
+            color: var(--success);
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
+        }
+
+        .control-panel {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        #btnConectar { background: linear-gradient(135deg, #0061ff 0%, #60efff 100%); color: #000; }
+        #btnDesconectar { background-color: #64748b; }
+        #btnLimpiar { background-color: #94a3b8; }
+        #btnPdf { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: #fff; }
         
-        /* Área de visualización con soporte estricto de formato de datos (100% fidelidad) */
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .terminal-wrapper {
+            position: relative;
+        }
+
+        .terminal-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #64748b;
+            margin-bottom: 6px;
+            display: block;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
         #terminal {
             width: 100%;
-            height: 400px;
-            background-color: #1e1e1e;
-            color: #00ff00;
-            font-family: 'Courier New', Courier, monospace;
+            height: 420px;
+            background-color: #0f172a;
+            color: #38ef7d;
+            font-family: 'Fira Code', 'Courier New', Courier, monospace;
             font-size: 13px;
-            padding: 15px;
+            padding: 20px;
             box-sizing: border-box;
-            border-radius: 4px;
+            border-radius: 8px;
             white-space: pre-wrap;
             overflow-y: auto;
             word-break: break-all;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+            border: 1px solid #334155;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 25px;
+            font-size: 12px;
+            color: #94a3b8;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h1>Capturador Fluke Impulse 7000DP</h1>
-        <div class="status">Estado: <span id="lblEstado" class="status disconnected">Desconectado</span></div>
+        <header>
+            <h1>🫀 Capturador Fluke Impulse 7000DP</h1>
+            <div id="lblEstado" class="status-badge disconnected">
+                <span class="dot"></span>Desconectado
+            </div>
+        </header>
 
-        <div class="buttons">
+        <div class="control-panel">
             <button id="btnConectar" onclick="conectarPuerto()">1. Conectar Puerto</button>
             <button id="btnDesconectar" onclick="desconectarPuerto()" disabled>Desconectar</button>
             <button id="btnLimpiar" onclick="limpiarPantalla()">Limpiar Pantalla</button>
             <button id="btnPdf" onclick="generarPDF()">2. Generar PDF / Imprimir</button>
         </div>
 
-        <div id="terminal">Esperando conexión con el equipo Fluke...</div>
+        <div class="terminal-wrapper">
+            <span class="terminal-label">Consola de Recepción de Datos</span>
+            <div id="terminal">Esperando conexión con el equipo Fluke...</div>
+        </div>
+
+        <footer>
+            Sistema de Adquisición de Datos Biomédicos | UVM
+        </footer>
     </div>
 
     <script>
@@ -102,18 +196,16 @@
             }
 
             try {
-                // Solicitar puerto filtrando por el chip FTDI del Fluke (VID y PID)
                 port = await navigator.serial.requestPort({
                     filters: [
                         { usbVendorId: 0x0403, usbProductId: 0x6001 }
                     ]
                 });
 
-                // Abierto a 115200 baudios que es la velocidad que respondió el equipo
                 await port.open({ baudRate: 115200 });
 
-                lblEstado.textContent = "Conectado";
-                lblEstado.className = "status connected";
+                lblEstado.innerHTML = '<span class="dot"></span>Conectado';
+                lblEstado.className = "status-badge connected";
                 btnConectar.disabled = true;
                 btnDesconectar.disabled = false;
                 terminal.textContent = "Conexión establecida a 115200 baudios. Transfiere los datos desde el Impulse 7000DP...\n\n";
@@ -123,8 +215,8 @@
 
             } catch (error) {
                 console.error("Error al conectar:", error);
-                lblEstado.textContent = "Error de conexión";
-                lblEstado.className = "status disconnected";
+                lblEstado.innerHTML = '<span class="dot"></span>Error de conexión';
+                lblEstado.className = "status-badge disconnected";
             }
         }
 
@@ -140,7 +232,6 @@
                         break;
                     }
                     if (value) {
-                        // Imprime los datos tal cual van llegando al puerto
                         terminal.textContent += value;
                         terminal.scrollTop = terminal.scrollHeight;
                     }
@@ -168,8 +259,8 @@
                 console.error("Error al cerrar el puerto:", error);
             }
 
-            lblEstado.textContent = "Desconectado";
-            lblEstado.className = "status disconnected";
+            lblEstado.innerHTML = '<span class="dot"></span>Desconectado';
+            lblEstado.className = "status-badge disconnected";
             btnConectar.disabled = false;
             btnDesconectar.disabled = true;
             terminal.textContent += "\n[Puerto desconectado]";
@@ -187,11 +278,13 @@
                     <head>
                         <title>Reporte Fluke Impulse 7000DP</title>
                         <style>
-                            body { font-family: 'Courier New', Courier, monospace; white-space: pre-wrap; padding: 20px; font-size: 12px; }
+                            body { font-family: 'Courier New', Courier, monospace; white-space: pre-wrap; padding: 25px; font-size: 12px; color: #111; }
+                            h2 { color: #0F4C81; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
                         </style>
                     </head>
                     <body>
-                        ${contenido}
+                        <h2>Reporte de Calibración - Fluke Impulse 7000DP</h2>
+                        <div>${contenido}</div>
                         <script>
                             window.onload = function() { window.print(); }
                         <\/script>
@@ -201,5 +294,7 @@
             ventanaImpresion.document.close();
         }
     </script>
+</body>
+</html>
 </body>
 </html>
