@@ -1,58 +1,122 @@
-<!-- Define que el documento es una página web moderna en HTML5 -->
 <!DOCTYPE html>
-<!-- Abre la etiqueta raíz de la página e indica que el idioma principal es español -->
 <html lang="es">
 <head>
-    <!-- Configura la codificación de caracteres para aceptar tildes y eñes correctamente -->
     <meta charset="UTF-8">
-    <!-- Hace que la página sea responsiva, adaptándose bien a celulares y computadoras -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Título que aparece en la pestaña del navegador -->
     <title>Capturador Fluke Impulse 7000DP</title>
-    <!-- Abre la sección de estilos visuales (CSS) para embellecer la página -->
     <style>
-        /* Estilos generales para todo el cuerpo de la página */
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f6f9;
             margin: 0;
-            padding: 20px;
+            padding: 0;
             color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
         }
-        /* Contenedor principal de la tarjeta central */
-        .container {
-            max-width: 850px;
-            margin: 0 auto;
+
+        /* CONTENEDOR DE LA PANTALLA DE INICIO DE SESIÓN */
+        #loginScreen {
             background: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
         }
-        /* Estilos para la sección opcional de inicio de sesión */
-        #authSection {
-            background: #e2e8f0;
-            padding: 12px 15px;
+
+        #loginScreen h2 {
+            color: #003366;
+            margin-bottom: 10px;
+        }
+
+        #loginScreen p {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
             border-radius: 6px;
-            margin-bottom: 20px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .btn-login-main {
+            width: 100%;
+            padding: 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .btn-guest {
+            width: 100%;
+            padding: 10px;
+            background-color: transparent;
+            color: #6c757d;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .btn-login-main:hover { background-color: #0056b3; }
+        .btn-guest:hover { background-color: #f8f9fa; color: #333; }
+
+        /* CONTENEDOR DE LA APLICACIÓN PRINCIPAL (Oculto hasta iniciar sesión o entrar) */
+        #appContainer {
+            display: none;
+            max-width: 850px;
+            width: 95%;
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            margin: 20px auto;
+        }
+
+        /* Barra superior dentro de la app */
+        .top-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            background: #e9ecef;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
             font-size: 14px;
         }
+
         h1 {
             color: #003366;
-            font-size: 24px;
+            font-size: 22px;
+            margin-top: 0;
         }
+
         .status {
             font-weight: bold;
             margin-bottom: 15px;
         }
         .status.disconnected { color: #d9534f; }
         .status.connected { color: #5cb85c; }
-        /* Caja para la fecha de calibración persistente */
+
         .calibration-box {
-            background-color: #e9ecef;
-            padding: 10px 15px;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            padding: 12px 15px;
             border-radius: 4px;
             margin-bottom: 15px;
             display: flex;
@@ -61,18 +125,20 @@
             font-size: 14px;
             font-weight: bold;
         }
-        .calibration-box input, input[type="text"] {
+        .calibration-box input {
             padding: 6px;
             border: 1px solid #ccc;
             border-radius: 4px;
             font-size: 14px;
         }
+
         .buttons {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
             margin-bottom: 20px;
         }
+
         button {
             padding: 10px 15px;
             font-size: 14px;
@@ -86,15 +152,12 @@
         #btnDesconectar { background-color: #6c757d; }
         #btnLimpiar { background-color: #6c757d; }
         #btnPdf { background-color: #28a745; }
-        #btnLogin { background-color: #17a2b8; }
-        #btnLogout { background-color: #dc3545; }
         #btnHistorial { background-color: #ffc107; color: #333; }
         button:hover { opacity: 0.9; }
-        
-        /* Terminal de visualización de datos */
+
         #terminal {
             width: 100%;
-            height: 300px;
+            height: 280px;
             background-color: #1e1e1e;
             color: #00ff00;
             font-family: 'Courier New', Courier, monospace;
@@ -107,12 +170,12 @@
             word-break: break-all;
             margin-bottom: 15px;
         }
-        /* Sección de historial de pruebas guardadas */
+
         #historySection {
             margin-top: 20px;
             border-top: 2px solid #ddd;
             padding-top: 15px;
-            display: none; /* Se muestra solo si el usuario inicia sesión */
+            display: none;
         }
         .history-item {
             background: #f8f9fa;
@@ -129,122 +192,132 @@
 </head>
 <body>
 
-    <div class="container">
-        <!-- SECCIÓN OPCIONAL DE INICIO DE SESIÓN -->
-        <div id="authSection">
-            <div>
-                👤 <strong>Modo Usuario:</strong> <span id="lblUsuario">Invitado (Opcional)</span>
-            </div>
-            <div id="loginForm">
-                <input type="text" id="txtUser" placeholder="Tu nombre (para guardar historial)..." />
-                <button id="btnLogin" onclick="iniciarSesion()">Identificarme</button>
-            </div>
-            <div id="logoutForm" style="display: none;">
-                <button id="btnLogout" onclick="cerrarSesion()">Cambiar / Salir</button>
-            </div>
+    <!-- 1. PANTALLA DE INICIO DE SESIÓN ESTILO GOOGLE / FORMULARIO -->
+    <div id="loginScreen">
+        <h2>Fluke Capture Tool</h2>
+        <p>Inicia sesión para guardar tus historiales de pruebas o ingresa como invitado.</p>
+        
+        <input type="text" id="txtUserLogin" class="login-input" placeholder="Nombre de usuario o técnico..." />
+        <button class="btn-login-main" onclick="entrarConUsuario()">Iniciar Sesión</button>
+        <button class="btn-guest" onclick="entrarComoInvitado()">Continuar como Invitado</button>
+    </div>
+
+    <!-- 2. APLICACIÓN PRINCIPAL (Oculta hasta acceder) -->
+    <div id="appContainer">
+        <div class="top-bar">
+            <div>👤 Usuario activo: <strong id="lblUsuarioActivo">Invitado</strong></div>
+            <button onclick="cerrarSesion()" style="background-color: #dc3545; padding: 5px 10px; font-size: 12px;">Cambiar Usuario / Salir</button>
         </div>
 
-        <!-- APLICACIÓN PRINCIPAL (Siempre visible y disponible de inmediato) -->
-        <div id="appSection">
-            <h1>Capturador Fluke Impulse 7000DP</h1>
-            <div class="status">Estado: <span id="lblEstado" class="status disconnected">Desconectado</span></div>
+        <h1>Capturador Fluke Impulse 7000DP</h1>
+        <div class="status">Estado: <span id="lblEstado" class="status disconnected">Desconectado</span></div>
 
-            <!-- Caja con la fecha de calibración fija en el navegador -->
-            <div class="calibration-box">
-                <label for="txtCalibDate">📅 Fecha de Calibración del Fluke (Guardada automáticamente):</label>
-                <input type="date" id="txtCalibDate" onchange="guardarFechaCalibracion()">
-            </div>
+        <!-- Fecha de calibración persistente -->
+        <div class="calibration-box">
+            <label for="txtCalibDate">📅 Fecha de Calibración del Fluke:</label>
+            <input type="date" id="txtCalibDate" onchange="guardarFechaCalibracion()">
+        </div>
 
-            <div class="buttons">
-                <button id="btnConectar" onclick="conectarPuerto()">1. Conectar Puerto</button>
-                <button id="btnDesconectar" onclick="desconectarPuerto()" disabled>Desconectar</button>
-                <button id="btnLimpiar" onclick="limpiarPantalla()">Limpiar Pantalla</button>
-                <button id="btnPdf" onclick="generarPDF()">2. Generar PDF / Imprimir</button>
-                <button id="btnHistorial" onclick="guardarPruebaActual()" style="display: none;" id="btnGuardarHistorial">💾 Guardar en Historial</button>
-            </div>
+        <div class="buttons">
+            <button id="btnConectar" onclick="conectarPuerto()">1. Conectar Puerto</button>
+            <button id="btnDesconectar" onclick="desconectarPuerto()" disabled>Desconectar</button>
+            <button id="btnLimpiar" onclick="limpiarPantalla()">Limpiar Pantalla</button>
+            <button id="btnPdf" onclick="generarPDF()">2. Generar PDF / Imprimir</button>
+            <button id="btnHistorial" onclick="guardarPruebaActual()" id="btnGuardarHistorial" style="display: none;">💾 Guardar en Historial</button>
+        </div>
 
-            <div id="terminal">Esperando conexión con el equipo Fluke...</div>
+        <div id="terminal">Esperando conexión con el equipo Fluke...</div>
 
-            <!-- HISTORIAL DE PRUEBAS GUARDADAS (Opcional) -->
-            <div id="historySection">
-                <h3>📁 Historial de Pruebas Guardadas</h3>
-                <div id="listaHistorial">No hay pruebas guardadas aún.</div>
-            </div>
+        <!-- HISTORIAL DE PRUEBAS -->
+        <div id="historySection">
+            <h3>📁 Historial de Pruebas Guardadas</h3>
+            <div id="listaHistorial">No hay pruebas guardadas aún.</div>
         </div>
     </div>
 
-    <!-- CÓDIGO JAVASCRIPT -->
     <script>
         let port;
         let reader;
         let inputStreamClosed;
         let keepReading = false;
 
+        const loginScreen = document.getElementById('loginScreen');
+        const appContainer = document.getElementById('appContainer');
+        const txtUserLogin = document.getElementById('txtUserLogin');
+        const lblUsuarioActivo = document.getElementById('lblUsuarioActivo');
+        const historySection = document.getElementById('historySection');
+        const btnGuardarHistorial = document.getElementById('btnHistorial');
+        const listaHistorial = document.getElementById('listaHistorial');
         const terminal = document.getElementById('terminal');
         const lblEstado = document.getElementById('lblEstado');
         const btnConectar = document.getElementById('btnConectar');
         const btnDesconectar = document.getElementById('btnDesconectar');
         const txtCalibDate = document.getElementById('txtCalibDate');
-        const loginForm = document.getElementById('loginForm');
-        const logoutForm = document.getElementById('logoutForm');
-        const lblUsuario = document.getElementById('lblUsuario');
-        const txtUser = document.getElementById('txtUser');
-        const historySection = document.getElementById('historySection');
-        const listaHistorial = document.getElementById('listaHistorial');
-        const btnGuardarHistorial = document.getElementById('btnHistorial');
 
-        // Al cargar la página, revisa si hay fecha guardada o si el usuario ya se había identificado antes
+        // Al cargar la página, revisa si hay fecha guardada y si ya había una sesión activa
         window.onload = function() {
             const fechaGuardada = localStorage.getItem("fluke_fecha_calibracion");
             if (fechaGuardada) {
                 txtCalibDate.value = fechaGuardada;
             } else {
-                txtCalibDate.value = "2026-01-15"; // Fecha predeterminada
+                txtCalibDate.value = "2026-01-15";
             }
 
             const usuarioGuardado = localStorage.getItem("fluke_usuario");
             if (usuarioGuardado) {
-                activarSesion(usuarioGuardado);
+                if (usuarioGuardado === "Invitado") {
+                    abrirApp("Invitado", false);
+                } else {
+                    abrirApp(usuarioGuardado, true);
+                }
             }
         };
 
-        // Función para identificarse opcionalmente
-        function iniciarSesion() {
-            const nombre = txtUser.value.trim();
+        // Entrar con un nombre de usuario formal
+        function entrarConUsuario() {
+            const nombre = txtUserLogin.value.trim();
             if (nombre === "") {
-                alert("Por favor ingresa un nombre válido.");
+                alert("Por favor ingresa un nombre de usuario.");
                 return;
             }
             localStorage.setItem("fluke_usuario", nombre);
-            activarSesion(nombre);
+            abrirApp(nombre, true);
         }
 
-        // Activa las opciones de historial al identificarse
-        function activarSesion(nombre) {
-            lblUsuario.textContent = nombre;
-            loginForm.style.display = "none";
-            logoutForm.style.display = "block";
-            historySection.style.display = "block";
-            btnGuardarHistorial.style.display = "inline-block";
-            cargarHistorial();
+        // Entrar rápido como invitado
+        function entrarComoInvitado() {
+            localStorage.setItem("fluke_usuario", "Invitado");
+            abrirApp("Invitado", false);
         }
 
-        // Quita la identificación activa
+        // Muestra la pantalla de la app y oculta el login
+        function abrirApp(usuario, permiteHistorial) {
+            loginScreen.style.display = "none";
+            appContainer.style.display = "block";
+            lblUsuarioActivo.textContent = usuario;
+
+            if (permiteHistorial) {
+                historySection.style.display = "block";
+                btnGuardarHistorial.style.display = "inline-block";
+                cargarHistorial();
+            } else {
+                historySection.style.display = "none";
+                btnGuardarHistorial.style.display = "none";
+            }
+        }
+
+        // Cierra sesión y regresa a la pantalla de login central
         function cerrarSesion() {
             localStorage.removeItem("fluke_usuario");
-            lblUsuario.textContent = "Invitado (Opcional)";
-            loginForm.style.display = "block";
-            logoutForm.style.display = "none";
-            historySection.style.display = "none";
-            btnGuardarHistorial.style.display = "none";
+            appContainer.style.display = "none";
+            loginScreen.style.display = "block";
+            txtUserLogin.value = "";
         }
 
-        // Guarda permanentemente la fecha de calibración en el navegador
         function guardarFechaCalibracion() {
             localStorage.setItem("fluke_fecha_calibracion", txtCalibDate.value);
         }
 
-        // Función para conectar el puerto serial del Fluke
         async function conectarPuerto() {
             if (!("serial" in navigator)) {
                 alert("Tu navegador no soporta la Web Serial API. Usa Google Chrome o Edge.");
@@ -273,7 +346,6 @@
             }
         }
 
-        // Lee los datos en tiempo real de la terminal
         async function leerDatos() {
             const textDecoder = new TextDecoderStream();
             inputStreamClosed = port.readable.pipeTo(textDecoder.writable);
@@ -295,7 +367,6 @@
             }
         }
 
-        // Desconecta el puerto de forma segura
         async function desconectarPuerto() {
             keepReading = false;
             try {
@@ -317,7 +388,6 @@
             terminal.textContent = "";
         }
 
-        // Guarda la prueba actual en el historial local (solo si se ha identificado)
         function guardarPruebaActual() {
             const contenido = terminal.textContent.trim();
             if (!contenido || contenido.includes("Esperando conexión")) {
@@ -343,7 +413,6 @@
             alert("¡Prueba guardada en el historial!");
         }
 
-        // Carga y muestra el historial de pruebas del usuario
         function cargarHistorial() {
             let historial = JSON.parse(localStorage.getItem("fluke_historial") || "[]");
             const usuarioActual = localStorage.getItem("fluke_usuario");
@@ -385,7 +454,6 @@
             cargarHistorial();
         }
 
-        // Genera el PDF incluyendo la fecha metrológica automática
         function generarPDF() {
             const contenido = terminal.textContent;
             const fechaCalibracion = txtCalibDate.value || "No especificada";
