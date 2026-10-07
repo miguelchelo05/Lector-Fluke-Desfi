@@ -8,7 +8,7 @@
     <!-- SDKs de Firebase -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateEmail, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateEmail, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         // Configuración de Firebase provista
@@ -53,6 +53,7 @@
         };
 
         window.cerrarSesion = async function() {
+            localStorage.clear();
             await signOut(auth);
             cerrarMenuLateral();
         };
@@ -67,6 +68,9 @@
             document.getElementById('cfgTipoFluke').value = "Fluke Impulse 7000DP";
             document.getElementById('lblTipoFlukeSpan').textContent = "Fluke Impulse 7000DP";
             document.getElementById('otroPatronContainer').style.display = "none";
+            document.getElementById('btnCambiarPass').style.display = "none";
+            
+            localStorage.setItem('seccionActiva', 'setupMenu');
         };
 
         // Escuchar cambios de estado de autenticación
@@ -74,18 +78,38 @@
             if (user) {
                 document.getElementById('loginCard').style.display = "none";
                 document.getElementById('registerCard').style.display = "none";
+                document.getElementById('btnHamburger').style.display = "block";
+                document.getElementById('lblUsuarioActivo').textContent = user.email;
+                document.getElementById('btnCambiarPass').style.display = "block";
+                
+                await cargarPerfilUsuario(user.email);
+                cargarHistorialCloud(user.email);
+
+                // Restaurar la última sección activa al recargar (F5)
+                const seccionGuardada = localStorage.getItem('seccionActiva') || 'setupMenu';
+                const equipoGuardado = localStorage.getItem('equipoActivo');
+
+                // Ocultar todas las vistas primero
+                document.getElementById('setupMenu').style.display = "none";
                 document.getElementById('appContainer').style.display = "none";
                 document.getElementById('savedHistoryView').style.display = "none";
                 document.getElementById('normasView').style.display = "none";
                 document.getElementById('seguridadView').style.display = "none";
                 document.getElementById('configView').style.display = "none";
-                
-                document.getElementById('setupMenu').style.display = "block";
-                document.getElementById('lblUsuarioActivo').textContent = user.email;
-                document.getElementById('btnHamburger').style.display = "block";
-                
-                await cargarPerfilUsuario(user.email);
-                cargarHistorialCloud(user.email);
+
+                // Mostrar la sección correspondiente
+                if (seccionGuardada === 'appContainer' && equipoGuardado) {
+                    document.getElementById('appContainer').style.display = "block";
+                    document.getElementById('lblInfoEquipo').textContent = equipoGuardado;
+                } else if (seccionGuardada && document.getElementById(seccionGuardada)) {
+                    document.getElementById(seccionGuardada).style.display = "block";
+                    if (seccionGuardada === 'savedHistoryView') {
+                        cargarHistorialCloud(user.email);
+                    }
+                } else {
+                    document.getElementById('setupMenu').style.display = "block";
+                }
+
             } else {
                 document.getElementById('setupMenu').style.display = "none";
                 document.getElementById('appContainer').style.display = "none";
@@ -106,6 +130,22 @@
             } else {
                 container.style.display = "none";
                 document.getElementById('lblTipoFlukeSpan').textContent = selectVal;
+            }
+        };
+
+        window.enviarCorreoCambioPassword = async function() {
+            const user = auth.currentUser;
+            if (!user || !user.email) {
+                alert("No hay una sesión activa para enviar el correo.");
+                return;
+            }
+            if (confirm(`¿Deseas enviar un enlace de verificación de cambio de contraseña a tu correo (${user.email})?`)) {
+                try {
+                    await sendPasswordResetEmail(auth, user.email);
+                    alert("¡Correo enviado con éxito! Revisa tu bandeja de entrada para cambiar tu contraseña de forma segura.");
+                } catch (e) {
+                    alert("Error al enviar el correo: " + e.message);
+                }
             }
         };
 
@@ -130,7 +170,6 @@
             }
 
             const nuevoCorreo = document.getElementById('cfgCorreo').value.trim();
-            const nuevaPass = document.getElementById('cfgPass').value.trim();
             const logoInput = document.getElementById('cfgLogoInput');
 
             try {
@@ -143,23 +182,20 @@
                     const reader = new FileReader();
                     reader.onload = async function(e) {
                         logoBase64 = e.target.result;
-                        await guardarDatosCloudConfig(user, nuevoNombre, nuevaCalib, tipoFlukeVal, logoBase64, nuevoCorreo, nuevaPass);
+                        await guardarDatosCloudConfig(user, nuevoNombre, nuevaCalib, tipoFlukeVal, logoBase64, nuevoCorreo);
                     };
                     reader.readAsDataURL(logoInput.files[0]);
                 } else {
-                    await guardarDatosCloudConfig(user, nuevoNombre, nuevaCalib, tipoFlukeVal, logoBase64, nuevoCorreo, nuevaPass);
+                    await guardarDatosCloudConfig(user, nuevoNombre, nuevaCalib, tipoFlukeVal, logoBase64, nuevoCorreo);
                 }
             } catch (e) {
                 alert("Error al guardar la configuración: " + e.message);
             }
         };
 
-        async function guardarDatosCloudConfig(user, nombre, calib, tipoFluke, logo, correo, pass) {
+        async function guardarDatosCloudConfig(user, nombre, calib, tipoFluke, logo, correo) {
             if (correo && correo !== user.email) {
                 await updateEmail(user, correo);
-            }
-            if (pass) {
-                await updatePassword(user, pass);
             }
 
             await setDoc(doc(db, "usuarios_config", user.email), {
@@ -251,19 +287,35 @@
             document.getElementById('seguridadView').style.display = 'none';
             document.getElementById('configView').style.display = 'none';
 
+            let targetId = '';
             if (seccionId === 'home') {
-                document.getElementById('setupMenu').style.display = 'block';
+                const equipoGuardado = localStorage.getItem('equipoActivo');
+                if (equipoGuardado) {
+                    targetId = 'appContainer';
+                    document.getElementById('appContainer').style.display = 'block';
+                    document.getElementById('lblInfoEquipo').textContent = equipoGuardado;
+                } else {
+                    targetId = 'setupMenu';
+                    document.getElementById('setupMenu').style.display = 'block';
+                }
             } else if (seccionId === 'historial') {
+                targetId = 'savedHistoryView';
                 document.getElementById('savedHistoryView').style.display = 'block';
                 const user = auth.currentUser;
                 if (user) cargarHistorialCloud(user.email);
             } else if (seccionId === 'normas') {
+                targetId = 'normasView';
                 document.getElementById('normasView').style.display = 'block';
             } else if (seccionId === 'seguridad') {
+                targetId = 'seguridadView';
                 document.getElementById('seguridadView').style.display = 'block';
             } else if (seccionId === 'config') {
+                targetId = 'configView';
                 document.getElementById('configView').style.display = 'block';
             }
+
+            // Guardar la sección activa para que persista al presionar F5
+            localStorage.setItem('seccionActiva', targetId);
         };
 
         window.irAPantallaMedicion = function() {
@@ -278,9 +330,20 @@
                 return;
             }
 
+            const infoStr = `${equipo} | Marca: ${marca} | Modelo: ${modelo} | Control: ${control} | Serie/Ref: ${serie}`;
+            
+            localStorage.setItem('equipoActivo', infoStr);
+            localStorage.setItem('seccionActiva', 'appContainer');
+
             document.getElementById('setupMenu').style.display = "none";
             document.getElementById('appContainer').style.display = "block";
-            document.getElementById('lblInfoEquipo').textContent = `${equipo} | Marca: ${marca} | Modelo: ${modelo} | Control: ${control} | Serie/Ref: ${serie}`;
+            document.getElementById('lblInfoEquipo').textContent = infoStr;
+        };
+
+        window.volverAlMenuEquipo = function() {
+            localStorage.setItem('seccionActiva', 'setupMenu');
+            document.getElementById('appContainer').style.display = "none";
+            document.getElementById('setupMenu').style.display = "block";
         };
 
         window.guardarPruebaActual = async function() {
@@ -344,9 +407,12 @@
 
         window.cargarPruebaEnTerminal = function(datosBase64) {
             window.irASeccion('home');
+            const equipoGuardado = localStorage.getItem('equipoActivo') || "Equipo Registrado";
             document.getElementById('appContainer').style.display = "block";
             document.getElementById('setupMenu').style.display = "none";
+            document.getElementById('lblInfoEquipo').textContent = equipoGuardado;
             document.getElementById('terminal').textContent = atob(datosBase64);
+            localStorage.setItem('seccionActiva', 'appContainer');
             alert("Prueba cargada en la terminal.");
         };
 
@@ -597,7 +663,7 @@
     <div id="appContainer">
         <div class="top-bar">
             <div>👤 Cuenta Cloud: <strong id="lblUsuarioActivo"></strong></div>
-            <button onclick="window.irASeccion('home')" style="background-color: #17a2b8; padding: 5px 10px; font-size: 12px;">Editar Datos Equipo</button>
+            <button onclick="window.volverAlMenuEquipo()" style="background-color: #17a2b8; padding: 5px 10px; font-size: 12px;">Editar Datos Equipo</button>
         </div>
 
         <div id="lblInfoEquipo" class="equipment-summary"></div>
@@ -674,10 +740,13 @@
                 <label>Correo Electrónico (Cloud)</label>
                 <input type="email" id="cfgCorreo" class="form-control" placeholder="correo@hospital.com" />
             </div>
-            <div class="form-group">
-                <label>Nueva Contraseña (Opcional)</label>
-                <input type="password" id="cfgPass" class="form-control" placeholder="Dejar en blanco para no cambiar" />
+
+            <!-- Botón seguro para actualizar contraseña mediante enlace de correo -->
+            <div class="form-group" id="btnCambiarPass" style="margin-top: 15px; margin-bottom: 20px;">
+                <label>Seguridad de la Cuenta</label>
+                <button type="button" onclick="window.enviarCorreoCambioPassword()" style="background-color: #ffc107; color: #333; padding: 9px 12px; width: 100%; border-radius: 6px; font-size: 14px; font-weight: bold; border: none; cursor: pointer;">🔐 Enviar enlace para cambiar contraseña por Correo</button>
             </div>
+
             <div class="form-group">
                 <label>⚡ Tipo de Analizador (Patrón)</label>
                 <select id="cfgTipoFluke" class="form-control" onchange="window.verificarTipoFluke()">
@@ -917,4 +986,3 @@
     </script>
 </body>
 </html>
-
