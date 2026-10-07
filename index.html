@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Capturador Analizador Fluke - Cloud</title>
+    <title>Capturador Analizador - Cloud</title>
     
     <!-- SDKs de Firebase -->
     <script type="module">
@@ -66,6 +66,7 @@
             document.getElementById('txtCalibDate').value = ""; 
             document.getElementById('cfgTipoFluke').value = "Fluke Impulse 7000DP";
             document.getElementById('lblTipoFlukeSpan').textContent = "Fluke Impulse 7000DP";
+            document.getElementById('otroPatronContainer').style.display = "none";
         };
 
         // Escuchar cambios de estado de autenticación
@@ -97,13 +98,37 @@
             }
         });
 
+        window.verificarTipoFluke = function() {
+            const selectVal = document.getElementById('cfgTipoFluke').value;
+            const container = document.getElementById('otroPatronContainer');
+            if (selectVal === "OTRO") {
+                container.style.display = "block";
+            } else {
+                container.style.display = "none";
+                document.getElementById('lblTipoFlukeSpan').textContent = selectVal;
+            }
+        };
+
         window.guardarConfiguracionPerfil = async function() {
             const user = auth.currentUser;
             if (!user) { alert("Estás en modo invitado."); return; }
 
             const nuevoNombre = document.getElementById('cfgNombreUsuario').value.trim();
             const nuevaCalib = document.getElementById('cfgCalibDate').value;
-            const nuevoTipoFluke = document.getElementById('cfgTipoFluke').value;
+            let tipoFlukeVal = document.getElementById('cfgTipoFluke').value;
+            
+            if (tipoFlukeVal === "OTRO") {
+                const nombrePatron = document.getElementById('otroNombre').value.trim();
+                const marcaPatron = document.getElementById('otroMarca').value.trim();
+                const modeloPatron = document.getElementById('otroModelo').value.trim();
+                const seriePatron = document.getElementById('otroSerie').value.trim();
+                if (!nombrePatron || !marcaPatron) {
+                    alert("Al seleccionar 'Otro', al menos el Nombre y la Marca del patrón son obligatorios.");
+                    return;
+                }
+                tipoFlukeVal = `${nombrePatron} - Marca: ${marcaPatron} (Mod: ${modeloPatron || 'N/A'}, SN: ${seriePatron || 'N/A'})`;
+            }
+
             const nuevoCorreo = document.getElementById('cfgCorreo').value.trim();
             const nuevaPass = document.getElementById('cfgPass').value.trim();
             const logoInput = document.getElementById('cfgLogoInput');
@@ -118,11 +143,11 @@
                     const reader = new FileReader();
                     reader.onload = async function(e) {
                         logoBase64 = e.target.result;
-                        await guardarDatosCloudConfig(user, nuevoNombre, nuevaCalib, nuevoTipoFluke, logoBase64, nuevoCorreo, nuevaPass);
+                        await guardarDatosCloudConfig(user, nuevoNombre, nuevaCalib, tipoFlukeVal, logoBase64, nuevoCorreo, nuevaPass);
                     };
                     reader.readAsDataURL(logoInput.files[0]);
                 } else {
-                    await guardarDatosCloudConfig(user, nuevoNombre, nuevaCalib, nuevoTipoFluke, logoBase64, nuevoCorreo, nuevaPass);
+                    await guardarDatosCloudConfig(user, nuevoNombre, nuevaCalib, tipoFlukeVal, logoBase64, nuevoCorreo, nuevaPass);
                 }
             } catch (e) {
                 alert("Error al guardar la configuración: " + e.message);
@@ -162,7 +187,25 @@
                     document.getElementById('txtCalibDate').value = data.calibracion || "";
                     
                     const tipoFlukeVal = data.tipoFluke || "Fluke Impulse 7000DP";
-                    document.getElementById('cfgTipoFluke').value = tipoFlukeVal;
+                    const selectEl = document.getElementById('cfgTipoFluke');
+                    
+                    let existeEnSelect = false;
+                    for (let i = 0; i < selectEl.options.length; i++) {
+                        if (selectEl.options[i].value === tipoFlukeVal) {
+                            existeEnSelect = true;
+                            break;
+                        }
+                    }
+
+                    if (existeEnSelect) {
+                        selectEl.value = tipoFlukeVal;
+                        document.getElementById('otroPatronContainer').style.display = "none";
+                    } else {
+                        selectEl.value = "OTRO";
+                        document.getElementById('otroPatronContainer').style.display = "block";
+                        document.getElementById('otroNombre').value = tipoFlukeVal;
+                    }
+
                     document.getElementById('lblTipoFlukeSpan').textContent = tipoFlukeVal;
 
                     if (data.logoUrl) {
@@ -237,7 +280,6 @@
 
             document.getElementById('setupMenu').style.display = "none";
             document.getElementById('appContainer').style.display = "block";
-            // Guardamos todo en el summary para almacenamiento interno, pero la hoja solo mostrará equipo y marca
             document.getElementById('lblInfoEquipo').textContent = `${equipo} | Marca: ${marca} | Modelo: ${modelo} | Control: ${control} | Serie/Ref: ${serie}`;
         };
 
@@ -560,7 +602,7 @@
 
         <div id="lblInfoEquipo" class="equipment-summary"></div>
 
-        <h1 id="lblTituloApp">Capturador Analizador Fluke</h1>
+        <h1 id="lblTituloApp">Capturador Analizador</h1>
         <div class="status">Estado: <span id="lblEstado" class="status disconnected">Desconectado</span></div>
 
         <div class="calibration-box">
@@ -581,7 +623,7 @@
             <button id="btnHistorial" onclick="window.guardarPruebaActual()">💾 Guardar en la Nube</button>
         </div>
 
-        <div id="terminal">Esperando conexión con el equipo Fluke...</div>
+        <div id="terminal">Esperando conexión con el equipo...</div>
     </div>
 
     <!-- SECCIÓN: PRUEBAS GUARDADAS -->
@@ -609,7 +651,7 @@
         <h2>Validación de Pruebas de Seguridad</h2>
         <p>Criterios de aceptación para liberación de equipos</p>
         <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; font-size: 14px; line-height: 1.6;">
-            <p><strong>Parámetros críticos evaluados por el analizador Fluke:</strong></p>
+            <p><strong>Parámetros críticos evaluados por el analizador:</strong></p>
             <ul>
                 <li>Precisión de energía descargada (Margen permitido general: ± 15% o según fabricante).</li>
                 <li>Tiempo de carga del desfibrilador a energía máxima.</li>
@@ -637,14 +679,37 @@
                 <input type="password" id="cfgPass" class="form-control" placeholder="Dejar en blanco para no cambiar" />
             </div>
             <div class="form-group">
-                <label>⚡ Tipo de Analizador Fluke (Patrón)</label>
-                <select id="cfgTipoFluke" class="form-control">
+                <label>⚡ Tipo de Analizador (Patrón)</label>
+                <select id="cfgTipoFluke" class="form-control" onchange="window.verificarTipoFluke()">
                     <option value="Fluke Impulse 7000DP">Fluke Impulse 7000DP</option>
                     <option value="Fluke Impulse 6000D">Fluke Impulse 6000D</option>
                     <option value="Fluke ESA712">Fluke ESA712</option>
                     <option value="Fluke Biomedical ProSim 8">Fluke Biomedical ProSim 8</option>
+                    <option value="OTRO">Otro (Personalizado)</option>
                 </select>
             </div>
+
+            <!-- Campos adicionales si selecciona OTRO -->
+            <div id="otroPatronContainer" style="display: none; background: #e9ecef; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+                <label style="font-size:12px; font-weight:bold; color:#003366; margin-bottom:8px; display:block;">Especificar Patrón Personalizado:</label>
+                <div class="form-group">
+                    <label>Nombre del Equipo / Patrón</label>
+                    <input type="text" id="otroNombre" class="form-control" placeholder="Ej. Simulador / Analizador X" />
+                </div>
+                <div class="form-group">
+                    <label>Marca</label>
+                    <input type="text" id="otroMarca" class="form-control" placeholder="Ej. Marca del equipo" />
+                </div>
+                <div class="form-group">
+                    <label>Modelo (Opcional)</label>
+                    <input type="text" id="otroModelo" class="form-control" placeholder="Ej. Modelo X" />
+                </div>
+                <div class="form-group">
+                    <label>Número de Serie (Opcional)</label>
+                    <input type="text" id="otroSerie" class="form-control" placeholder="Ej. SN-0000" />
+                </div>
+            </div>
+
             <div class="form-group">
                 <label>📅 Fecha de Calibración del Patrón</label>
                 <input type="date" id="cfgCalibDate" class="form-control" />
@@ -735,7 +800,6 @@
             const tipoFluke = document.getElementById('lblTipoFlukeSpan').textContent;
             const nombreResponsable = document.getElementById('cfgNombreUsuario').value.trim() || "Usuario";
             
-            // Extraer exclusivamente Equipo y Marca del string guardado
             const infoEquipoCompleta = document.getElementById('lblInfoEquipo').textContent;
             let equipoTexto = "No especificado";
             let marcaTexto = "No especificada";
