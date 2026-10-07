@@ -85,11 +85,9 @@
                 await cargarPerfilUsuario(user.email);
                 cargarHistorialCloud(user.email);
 
-                // Restaurar la última sección activa al recargar (F5)
                 const seccionGuardada = localStorage.getItem('seccionActiva') || 'setupMenu';
                 const equipoGuardado = localStorage.getItem('equipoActivo');
 
-                // Ocultar todas las vistas primero
                 document.getElementById('setupMenu').style.display = "none";
                 document.getElementById('appContainer').style.display = "none";
                 document.getElementById('savedHistoryView').style.display = "none";
@@ -97,7 +95,6 @@
                 document.getElementById('seguridadView').style.display = "none";
                 document.getElementById('configView').style.display = "none";
 
-                // Mostrar la sección correspondiente
                 if (seccionGuardada === 'appContainer' && equipoGuardado) {
                     document.getElementById('appContainer').style.display = "block";
                     document.getElementById('lblInfoEquipo').textContent = equipoGuardado;
@@ -314,7 +311,6 @@
                 document.getElementById('configView').style.display = 'block';
             }
 
-            // Guardar la sección activa para que persista al presionar F5
             localStorage.setItem('seccionActiva', targetId);
         };
 
@@ -332,7 +328,14 @@
 
             const infoStr = `${equipo} | Marca: ${marca} | Modelo: ${modelo} | Control: ${control} | Serie/Ref: ${serie}`;
             
+            // Reiniciar o inicializar contador de pruebas para este equipo nuevo
+            let contadorKey = `pruebaCount_${serie}`;
+            if (!localStorage.getItem(contadorKey)) {
+                localStorage.setItem(contadorKey, '0');
+            }
+
             localStorage.setItem('equipoActivo', infoStr);
+            localStorage.setItem('serieActiva', serie);
             localStorage.setItem('seccionActiva', 'appContainer');
 
             document.getElementById('setupMenu').style.display = "none";
@@ -356,9 +359,18 @@
                 alert("No hay datos válidos para guardar.");
                 return;
             }
+
+            // Incrementar contador de prueba
+            const serieActiva = localStorage.getItem('serieActiva') || 'general';
+            let contadorKey = `pruebaCount_${serieActiva}`;
+            let numPrueba = parseInt(localStorage.getItem(contadorKey) || '0') + 1;
+            localStorage.setItem(contadorKey, numPrueba);
+            const tituloPrueba = `Prueba ${numPrueba}`;
+
             try {
                 await addDoc(collection(db, "pruebas_fluke"), {
                     usuario: user.email,
+                    titulo: tituloPrueba,
                     fecha: new Date().toLocaleString(),
                     datosEquipo: infoEquipo,
                     calibracionPatron: fechaCal,
@@ -366,7 +378,7 @@
                     datos: contenido,
                     timestamp: Date.now()
                 });
-                alert("¡Prueba guardada en la nube con éxito!");
+                alert(`¡${tituloPrueba} guardada en la nube con éxito!`);
             } catch (e) {
                 alert("Error al guardar en la nube: " + e.message);
             }
@@ -389,9 +401,10 @@
                 querySnapshot.forEach((docSnapshot) => {
                     const p = docSnapshot.data();
                     const docId = docSnapshot.id;
+                    const tituloDisplay = p.titulo || "Prueba Registrada";
                     html += `
                         <div class="history-item">
-                            <span>🕒 <strong>${p.fecha}</strong><br><small>${p.datosEquipo || ''}</small></span>
+                            <span>🕒 <strong>${tituloDisplay}</strong> - ${p.fecha}<br><small>${p.datosEquipo || ''}</small></span>
                             <div>
                                 <button onclick="window.cargarPruebaEnTerminal('${btoa(p.datos)}')" style="background-color: #007bff; padding: 5px 10px; font-size: 12px; color:white; border:none; border-radius:4px; cursor:pointer;">Cargar</button>
                                 <button onclick="window.eliminarPruebaCloud('${docId}', '${email}')" style="background-color: #dc3545; padding: 5px 10px; font-size: 12px; color:white; border:none; border-radius:4px; cursor:pointer;">Eliminar</button>
@@ -879,6 +892,13 @@
                 if (partes.length > 1) marcaTexto = partes[1].replace("Marca:", "").trim();
             }
 
+            // Generar o avanzar título de prueba al imprimir/generar PDF
+            const serieActiva = localStorage.getItem('serieActiva') || 'general';
+            let contadorKey = `pruebaCount_${serieActiva}`;
+            let numPrueba = parseInt(localStorage.getItem(contadorKey) || '0') + 1;
+            localStorage.setItem(contadorKey, numPrueba);
+            const tituloPrueba = `Prueba ${numPrueba}`;
+
             const logoSrc = document.getElementById('cfgLogoPreview').src;
             const tieneLogoValido = logoSrc && logoSrc.startsWith('data:image') && document.getElementById('cfgLogoPreview').style.display !== 'none';
             const mostrarLogo = tieneLogoValido ? `<img src="${logoSrc}" style="max-height: 50px; max-width: 150px;">` : '';
@@ -890,7 +910,7 @@
                 <html lang="es">
                     <head>
                         <meta charset="UTF-8">
-                        <title>Reporte Técnico - ${tipoFluke}</title>
+                        <title>${tituloPrueba} - Reporte Técnico</title>
                         <style>
                             @page {
                                 size: letter;
@@ -955,7 +975,7 @@
                     <body>
                         <div class="header-container">
                             <div>
-                                <h2>REPORTE TÉCNICO DE PRUEBA</h2>
+                                <h2>REPORTE TÉCNICO DE ${tituloPrueba.toUpperCase()}</h2>
                                 <small>Analizador Biomédico</small>
                             </div>
                             <div class="logo-container">${mostrarLogo}</div>
