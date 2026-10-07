@@ -8,7 +8,7 @@
     <!-- SDKs de Firebase -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateEmail, updatePassword } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         // Configuración de Firebase provista
@@ -54,6 +54,7 @@
 
         window.cerrarSesion = async function() {
             await signOut(auth);
+            cerrarMenuLateral();
         };
 
         window.entrarComoInvitado = function() {
@@ -61,8 +62,6 @@
             document.getElementById('registerCard').style.display = "none";
             document.getElementById('setupMenu').style.display = "block";
             document.getElementById('lblUsuarioActivo').textContent = "Invitado (Sin Historial)";
-            document.getElementById('historySection').style.display = "none";
-            document.getElementById('btnHistorial').style.display = "none";
             document.getElementById('txtCalibDate').value = ""; 
         };
 
@@ -72,48 +71,138 @@
                 document.getElementById('loginCard').style.display = "none";
                 document.getElementById('registerCard').style.display = "none";
                 document.getElementById('appContainer').style.display = "none";
+                document.getElementById('savedHistoryView').style.display = "none";
+                document.getElementById('normasView').style.display = "none";
+                document.getElementById('seguridadView').style.display = "none";
+                document.getElementById('configView').style.display = "none";
+                
                 document.getElementById('setupMenu').style.display = "block";
                 document.getElementById('lblUsuarioActivo').textContent = user.email;
-                document.getElementById('historySection').style.display = "block";
-                document.getElementById('btnHistorial').style.display = "inline-block";
+                document.getElementById('btnHamburger').style.display = "block";
                 
                 await cargarPerfilUsuario(user.email);
                 cargarHistorialCloud(user.email);
             } else {
                 document.getElementById('setupMenu').style.display = "none";
                 document.getElementById('appContainer').style.display = "none";
+                document.getElementById('savedHistoryView').style.display = "none";
+                document.getElementById('normasView').style.display = "none";
+                document.getElementById('seguridadView').style.display = "none";
+                document.getElementById('configView').style.display = "none";
+                document.getElementById('btnHamburger').style.display = "none";
                 document.getElementById('loginCard').style.display = "block";
             }
         });
 
-        window.guardarFechaCalibracion = async function() {
+        window.guardarConfiguracionPerfil = async function() {
             const user = auth.currentUser;
-            if (!user) return;
-            const fechaVal = document.getElementById('txtCalibDate').value;
+            if (!user) { alert("Estás en modo invitado."); return; }
+
+            const nuevoNombre = document.getElementById('cfgNombreUsuario').value.trim();
+            const nuevaCalib = document.getElementById('cfgCalibDate').value;
+            const nuevoCorreo = document.getElementById('cfgCorreo').value.trim();
+            const nuevaPass = document.getElementById('cfgPass').value.trim();
+            const logoInput = document.getElementById('cfgLogoInput');
+
             try {
-                await setDoc(doc(db, "usuarios_config", user.email), {
-                    calibracion: fechaVal
-                }, { merge: true });
+                let logoBase64 = document.getElementById('cfgLogoPreview').src || "";
+                
+                if (logoInput.files && logoInput.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = async function(e) {
+                        logoBase64 = e.target.result;
+                        await guardarDatosCloudConfig(user, nuevoNombre, nuevaCalib, logoBase64, nuevoCorreo, nuevaPass);
+                    };
+                    reader.readAsDataURL(logoInput.files[0]);
+                } else {
+                    await guardarDatosCloudConfig(user, nuevoNombre, nuevaCalib, logoBase64, nuevoCorreo, nuevaPass);
+                }
             } catch (e) {
-                console.error("Error al guardar calibración: ", e);
+                alert("Error al guardar la configuración: " + e.message);
             }
         };
+
+        async function guardarDatosCloudConfig(user, nombre, calib, logo, correo, pass) {
+            // Actualizar correo o contraseña en Auth si se solicita
+            if (correo && correo !== user.email) {
+                await updateEmail(user, correo);
+            }
+            if (pass) {
+                await updatePassword(user, pass);
+            }
+
+            // Guardar en Firestore
+            await setDoc(doc(db, "usuarios_config", user.email), {
+                nombreUsuario: nombre,
+                calibracion: calib,
+                logoUrl: logo
+            }, { merge: true });
+
+            alert("¡Configuración guardada exitosamente!");
+            document.getElementById('lblUsuarioActivo').textContent = user.email;
+        }
 
         async function cargarPerfilUsuario(email) {
             try {
                 const docRef = doc(db, "usuarios_config", email);
                 const docSnap = await getDoc(docRef);
-                if (docSnap.exists() && docSnap.data().calibracion) {
-                    document.getElementById('txtCalibDate').value = docSnap.data().calibracion;
-                } else {
-                    document.getElementById('txtCalibDate').value = "";
+                document.getElementById('cfgCorreo').value = email;
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    document.getElementById('cfgNombreUsuario').value = data.nombreUsuario || "";
+                    document.getElementById('cfgCalibDate').value = data.calibracion || "";
+                    document.getElementById('txtCalibDate').value = data.calibracion || "";
+                    if (data.logoUrl) {
+                        document.getElementById('cfgLogoPreview').src = data.logoUrl;
+                        document.getElementById('cfgLogoPreview').style.display = "block";
+                    }
                 }
             } catch (e) {
                 console.error("Error al cargar perfil:", e);
             }
         }
 
-        // Transición del Menú Inicial a la Pantalla de Medición
+        // Navegación del Menú Hamburguesa
+        window.toggleMenu = function() {
+            const sidebar = document.getElementById('sidebarMenu');
+            const overlay = document.getElementById('menuOverlay');
+            if (sidebar.style.left === '0px') {
+                cerrarMenuLateral();
+            } else {
+                sidebar.style.left = '0px';
+                overlay.style.display = 'block';
+            }
+        };
+
+        window.cerrarMenuLateral = function() {
+            document.getElementById('sidebarMenu').style.left = '-260px';
+            document.getElementById('menuOverlay').style.display = 'none';
+        };
+
+        window.irASeccion = function(seccionId) {
+            cerrarMenuLateral();
+            document.getElementById('setupMenu').style.display = 'none';
+            document.getElementById('appContainer').style.display = 'none';
+            document.getElementById('savedHistoryView').style.display = 'none';
+            document.getElementById('normasView').style.display = 'none';
+            document.getElementById('seguridadView').style.display = 'none';
+            document.getElementById('configView').style.display = 'none';
+
+            if (seccionId === 'home') {
+                document.getElementById('setupMenu').style.display = 'block';
+            } else if (seccionId === 'historial') {
+                document.getElementById('savedHistoryView').style.display = 'block';
+                const user = auth.currentUser;
+                if (user) cargarHistorialCloud(user.email);
+            } else if (seccionId === 'normas') {
+                document.getElementById('normasView').style.display = 'block';
+            } else if (seccionId === 'seguridad') {
+                document.getElementById('seguridadView').style.display = 'block';
+            } else if (seccionId === 'config') {
+                document.getElementById('configView').style.display = 'block';
+            }
+        };
+
         window.irAPantallaMedicion = function() {
             const equipo = document.getElementById('eqNombre').value.trim();
             const marca = document.getElementById('eqMarca').value.trim();
@@ -126,17 +215,9 @@
                 return;
             }
 
-            // Ocultar menú y mostrar app principal
             document.getElementById('setupMenu').style.display = "none";
             document.getElementById('appContainer').style.display = "block";
-
-            // Inyectar resumen de datos del equipo en la barra superior o terminal si se requiere
             document.getElementById('lblInfoEquipo').textContent = `${equipo} | Marca: ${marca} | Modelo: ${modelo} | Control: ${control} | Serie: ${serie}`;
-        };
-
-        window.volverAlMenuEquipo = function() {
-            document.getElementById('appContainer').style.display = "none";
-            document.getElementById('setupMenu').style.display = "block";
         };
 
         window.guardarPruebaActual = async function() {
@@ -159,21 +240,21 @@
                     timestamp: Date.now()
                 });
                 alert("¡Prueba guardada en la nube con éxito!");
-                cargarHistorialCloud(user.email);
             } catch (e) {
                 alert("Error al guardar en la nube: " + e.message);
             }
         };
 
         async function cargarHistorialCloud(email) {
-            const listaHistorial = document.getElementById('listaHistorial');
-            listaHistorial.innerHTML = "Cargando historial desde la nube...";
+            const listaHistorialPrincipal = document.getElementById('listaHistorialPrincipal');
+            if(listaHistorialPrincipal) listaHistorialPrincipal.innerHTML = "Cargando historial desde la nube...";
+            
             try {
                 const q = query(collection(db, "pruebas_fluke"), where("usuario", "==", email));
                 const querySnapshot = await getDocs(q);
                 
                 if (querySnapshot.empty) {
-                    listaHistorial.innerHTML = "No hay pruebas guardadas en la nube.";
+                    if(listaHistorialPrincipal) listaHistorialPrincipal.innerHTML = "No hay pruebas guardadas en la nube.";
                     return;
                 }
 
@@ -191,13 +272,16 @@
                         </div>
                     `;
                 });
-                listaHistorial.innerHTML = html;
+                if(listaHistorialPrincipal) listaHistorialPrincipal.innerHTML = html;
             } catch (e) {
-                listaHistorial.innerHTML = "Error al cargar historial.";
+                if(listaHistorialPrincipal) listaHistorialPrincipal.innerHTML = "Error al cargar historial.";
             }
         }
 
         window.cargarPruebaEnTerminal = function(datosBase64) {
+            window.irASeccion('home');
+            document.getElementById('appContainer').style.display = "block";
+            document.getElementById('setupMenu').style.display = "none";
             document.getElementById('terminal').textContent = atob(datosBase64);
             alert("Prueba cargada en la terminal.");
         };
@@ -226,17 +310,87 @@
             align-items: center;
             min-height: 100vh;
         }
-        .auth-card, .setup-card {
+        .hamburger-btn {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            background: #003366;
+            color: white;
+            border: none;
+            padding: 10px 14px;
+            font-size: 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            z-index: 1001;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            display: none;
+        }
+        .hamburger-btn:hover { background: #002244; }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: -260px;
+            width: 260px;
+            height: 100%;
+            background: #ffffff;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.15);
+            z-index: 1002;
+            transition: left 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-header {
+            background: #003366;
+            color: white;
+            padding: 20px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .sidebar-menu-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+        .sidebar-menu-list li a {
+            display: block;
+            padding: 15px 20px;
+            color: #333;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: bold;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .sidebar-menu-list li a:hover {
+            background: #f0f4f8;
+            color: #007bff;
+        }
+        .menu-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.4);
+            z-index: 1000;
+            display: none;
+        }
+
+        .auth-card, .setup-card, .content-card {
             background: #fff;
             padding: 35px;
             border-radius: 10px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             width: 100%;
-            max-width: 480px;
+            max-width: 500px;
             box-sizing: border-box;
+            margin-top: 40px;
         }
-        .auth-card h2, .setup-card h2 { color: #003366; margin-top: 0; margin-bottom: 8px; text-align: center; }
-        .auth-card p, .setup-card p { color: #666; font-size: 14px; margin-bottom: 20px; text-align: center; }
+        .auth-card h2, .setup-card h2, .content-card h2 { color: #003366; margin-top: 0; margin-bottom: 8px; text-align: center; }
+        .auth-card p, .setup-card p, .content-card p { color: #666; font-size: 14px; margin-bottom: 20px; text-align: center; }
         .form-group { margin-bottom: 12px; }
         .form-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 4px; color: #444; }
         .form-control { width: 100%; padding: 9px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
@@ -247,7 +401,6 @@
         .auth-switch { text-align: center; margin-top: 15px; font-size: 13px; color: #666; }
         .auth-switch a { color: #007bff; text-decoration: none; font-weight: bold; cursor: pointer; }
 
-        /* Tarjeta central Medir con icono de palas */
         .measure-banner {
             background: linear-gradient(135deg, #003366, #0056b3);
             border-radius: 12px;
@@ -256,25 +409,13 @@
             cursor: pointer;
             margin-top: 20px;
             box-shadow: 0 4px 10px rgba(0,51,102,0.3);
-            transition: transform 0.2s, background 0.2s;
+            transition: transform 0.2s;
         }
-        .measure-banner:hover {
-            transform: translateY(-2px);
-            background: linear-gradient(135deg, #002244, #004080);
-        }
-        .measure-icon {
-            font-size: 45px;
-            margin-bottom: 5px;
-        }
-        .measure-text {
-            color: #ffffff;
-            font-size: 22px;
-            font-weight: bold;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
+        .measure-banner:hover { transform: translateY(-2px); }
+        .measure-icon { font-size: 45px; margin-bottom: 5px; }
+        .measure-text { color: #ffffff; font-size: 22px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
 
-        #appContainer {
+        #appContainer, #savedHistoryView, #normasView, #seguridadView, #configView {
             display: none;
             max-width: 850px;
             width: 95%;
@@ -282,7 +423,7 @@
             padding: 25px;
             border-radius: 8px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            margin: 20px auto;
+            margin: 40px auto;
         }
         .top-bar { display: flex; justify-content: space-between; align-items: center; background: #e9ecef; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; font-size: 13px; }
         .equipment-summary { background: #e2f0d9; border: 1px solid #c8e6c9; padding: 10px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 15px; color: #2e7d32; font-weight: bold; }
@@ -300,11 +441,28 @@
         #btnPdf { background-color: #28a745; }
         #btnHistorial { background-color: #ffc107; color: #333; }
         #terminal { width: 100%; height: 260px; background-color: #1e1e1e; color: #00ff00; font-family: 'Courier New', Courier, monospace; font-size: 13px; padding: 15px; box-sizing: border-box; border-radius: 4px; white-space: pre-wrap; overflow-y: auto; word-break: break-all; margin-bottom: 15px; }
-        #historySection { margin-top: 20px; border-top: 2px solid #ddd; padding-top: 15px; }
         .history-item { background: #f8f9fa; padding: 10px; border-radius: 4px; margin-bottom: 8px; border-left: 4px solid #007bff; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+        .logo-preview { max-width: 120px; max-height: 60px; display: none; margin-top: 5px; border: 1px solid #ddd; padding: 2px; }
     </style>
 </head>
 <body>
+
+    <!-- BOTÓN MENÚ HAMBURGUESA Y OVERLAY -->
+    <button class="hamburger-btn" onclick="window.toggleMenu()" id="btnHamburger">☰</button>
+    <div class="menu-overlay" id="menuOverlay" onclick="window.cerrarMenuLateral()"></div>
+
+    <!-- MENÚ LATERAL DESPLEGABLE -->
+    <div class="sidebar" id="sidebarMenu">
+        <div class="sidebar-header">Menú Principal</div>
+        <ul class="sidebar-menu-list">
+            <li><a onclick="window.irASeccion('home')">🏠 Home (Realizar Pruebas)</a></li>
+            <li><a onclick="window.irASeccion('historial')">📁 Pruebas Guardadas</a></li>
+            <li><a onclick="window.irASeccion('normas')">📖 Normativas</a></li>
+            <li><a onclick="window.irASeccion('seguridad')">⚡ Validación Pruebas de Seguridad</a></li>
+            <li><a onclick="window.irASeccion('config')">⚙️ Configuración</a></li>
+            <li><a onclick="window.cerrarSesion()" style="color: #dc3545;">🚪 Cerrar Sesión</a></li>
+        </ul>
+    </div>
 
     <!-- LOGIN -->
     <div id="loginCard" class="auth-card">
@@ -319,7 +477,7 @@
             <input type="password" id="loginPass" class="form-control" placeholder="••••••••" />
         </div>
         <button class="btn-auth" onclick="window.iniciarSesion()">Entrar</button>
-        <button class="btn-guest-login" onclick="window.entrarComoInvitado()">Continuar como Invitado</button>
+        <button class="btn-guest-login" onclick="window.entrarComoInvitado();">Continuar como Invitado</button>
         <div class="auth-switch">¿Institución nueva? <a onclick="document.getElementById('loginCard').style.display='none'; document.getElementById('registerCard').style.display='block';">Regístrate aquí</a></div>
     </div>
 
@@ -339,7 +497,7 @@
         <div class="auth-switch">¿Ya tienes cuenta? <a onclick="document.getElementById('registerCard').style.display='none'; document.getElementById('loginCard').style.display='block';">Inicia sesión</a></div>
     </div>
 
-    <!-- MENÚ PREVIO: DATOS DEL EQUIPO MÉDICO -->
+    <!-- MENÚ PREVIO: DATOS DEL EQUIPO (HOME) -->
     <div id="setupMenu" class="setup-card" style="display: none;">
         <h2>Identificación del Equipo</h2>
         <p>Ingresa los datos del dispositivo bajo prueba</p>
@@ -365,14 +523,9 @@
             <input type="text" id="eqSerie" class="form-control" placeholder="Ej. SN-8839201" />
         </div>
 
-        <!-- Botón Central con Palas / Desfibrilador -->
         <div class="measure-banner" onclick="window.irAPantallaMedicion()">
             <div class="measure-icon">⚡</div>
             <div class="measure-text">Medir</div>
-        </div>
-
-        <div style="text-align: right; margin-top: 15px;">
-            <button onclick="window.cerrarSesion()" style="background-color: #dc3545; padding: 6px 12px; font-size: 12px;">Cerrar Sesión</button>
         </div>
     </div>
 
@@ -380,10 +533,7 @@
     <div id="appContainer">
         <div class="top-bar">
             <div>👤 Cuenta Cloud: <strong id="lblUsuarioActivo"></strong></div>
-            <div>
-                <button onclick="window.volverAlMenuEquipo()" style="background-color: #17a2b8; padding: 5px 10px; font-size: 12px; margin-right: 5px;">Editar Datos Equipo</button>
-                <button onclick="window.cerrarSesion()" style="background-color: #dc3545; padding: 5px 10px; font-size: 12px;">Cerrar Sesión</button>
-            </div>
+            <button onclick="window.irASeccion('home')" style="background-color: #17a2b8; padding: 5px 10px; font-size: 12px;">Editar Datos Equipo</button>
         </div>
 
         <div id="lblInfoEquipo" class="equipment-summary"></div>
@@ -393,7 +543,7 @@
 
         <div class="calibration-box">
             <label for="txtCalibDate">📅 Fecha de Calibración del Fluke:</label>
-            <input type="date" id="txtCalibDate" onchange="window.guardarFechaCalibracion()">
+            <input type="date" id="txtCalibDate" onchange="document.getElementById('cfgCalibDate').value=this.value; window.guardarConfiguracionPerfil();">
         </div>
 
         <div class="buttons">
@@ -405,10 +555,71 @@
         </div>
 
         <div id="terminal">Esperando conexión con el equipo Fluke...</div>
+    </div>
 
-        <div id="historySection">
-            <h3>📁 Historial de Pruebas (Sincronizado en la Nube)</h3>
-            <div id="listaHistorial">Cargando...</div>
+    <!-- SECCIÓN: PRUEBAS GUARDADAS -->
+    <div id="savedHistoryView">
+        <h2>Pruebas Guardadas en la Nube</h2>
+        <p>Historial centralizado de reportes clínicos</p>
+        <div id="listaHistorialPrincipal">Cargando...</div>
+    </div>
+
+    <!-- SECCIÓN: NORMATIVAS -->
+    <div id="normasView">
+        <h2>Normativas de Referencia</h2>
+        <p>Estándares aplicables a equipos electromédicos y desfibriladores</p>
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; font-size: 14px; line-height: 1.6;">
+            <ul>
+                <li><strong>IEC 60601-1:</strong> Requisitos generales para la seguridad básica y funcionamiento esencial de equipos electromédicos.</li>
+                <li><strong>IEC 60601-2-4:</strong> Requisitos particulares para la seguridad básica y funcionamiento esencial de desfibriladores cardíacos.</li>
+                <li><strong>Tecnovigilancia:</strong> Protocolos institucionales para el reporte de incidentes adversos con dispositivos médicos.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- SECCIÓN: VALIDACIÓN DE PRUEBAS DE SEGURIDAD -->
+    <div id="seguridadView">
+        <h2>Validación de Pruebas de Seguridad</h2>
+        <p>Criterios de aceptación para liberación de equipos</p>
+        <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; font-size: 14px; line-height: 1.6;">
+            <p><strong>Parámetros críticos evaluados por el Fluke Impulse 7000DP:</strong></p>
+            <ul>
+                <li>Precisión de energía descargada (Margen permitido general: ± 15% o según fabricante).</li>
+                <li>Tiempo de carga del desfibrilador a energía máxima.</li>
+                <li>Pruebas de sincronismo (Cardioversión).</li>
+                <li>Análisis de forma de onda bifásica.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- SECCIÓN: CONFIGURACIÓN -->
+    <div id="configView">
+        <h2>Configuración de Cuenta y Patrón</h2>
+        <p>Personaliza tus datos de usuario, credenciales, calibración y logotipo para reportes</p>
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 6px;">
+            <div class="form-group">
+                <label>Nombre de Usuario / Ingeniero Responsable</label>
+                <input type="text" id="cfgNombreUsuario" class="form-control" placeholder="Ej. Ing. Carlos Mendoza" />
+            </div>
+            <div class="form-group">
+                <label>Correo Electrónico (Cloud)</label>
+                <input type="email" id="cfgCorreo" class="form-control" placeholder="correo@hospital.com" />
+            </div>
+            <div class="form-group">
+                <label>Nueva Contraseña (Opcional)</label>
+                <input type="password" id="cfgPass" class="form-control" placeholder="Dejar en blanco para no cambiar" />
+            </div>
+            <div class="form-group">
+                <label>📅 Fecha de Calibración del Patrón (Fluke Impulse 7000DP)</label>
+                <input type="date" id="cfgCalibDate" class="form-control" />
+            </div>
+            <div class="form-group">
+                <label>Logotipo Institucional (Para membrete de PDF)</label>
+                <input type="file" id="cfgLogoInput" class="form-control" accept="image/*" />
+                <br>
+                <img id="cfgLogoPreview" class="logo-preview" alt="Vista previa del logo" />
+            </div>
+            <button class="btn-auth" onclick="window.guardarConfiguracionPerfil()" style="background-color: #28a745;">Guardar Cambios</button>
         </div>
     </div>
 
@@ -473,17 +684,29 @@
             const fechaCal = document.getElementById('txtCalibDate').value || "No especificada";
             const usuarioActivo = document.getElementById('lblUsuarioActivo').textContent;
             const infoEquipo = document.getElementById('lblInfoEquipo').textContent;
+            const nombreResponsable = document.getElementById('cfgNombreUsuario').value || usuarioActivo;
+            const logoSrc = document.getElementById('cfgLogoPreview').src;
+            const mostrarLogo = (logoSrc && logoSrc.startsWith('data:image')) ? `<img src="${logoSrc}" style="max-height: 50px; float: right;">` : '';
 
             const ventanaImpresion = window.open('', '', 'width=900,height=700');
             ventanaImpresion.document.write(`
                 <html>
                     <head><title>Reporte Fluke</title></head>
-                    <body style="font-family:monospace; padding:20px; font-size:12px;">
-                        <strong>REPORTE FLUKE IMPULSE 7000DP</strong><br>
-                        Usuario: ${usuarioActivo}<br>
-                        Datos del Equipo: ${infoEquipo}<br><hr>
-                        <pre>${contenido}</pre><hr>
-                        Fecha Calibración Patrón: ${fechaCal}
+                    <body style="font-family:Arial, sans-serif; padding:25px; font-size:13px; color:#333;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #003366; padding-bottom:10px; margin-bottom:15px;">
+                            <div>
+                                <h2 style="margin:0; color:#003366;">REPORTE TÉCNICO DE PRUEBA</h2>
+                                <small>Analizador Fluke Impulse 7000DP</small>
+                            </div>
+                            <div>${mostrarLogo}</div>
+                        </div>
+                        <p><strong>Responsable:</strong> ${nombreResponsable} (${usuarioActivo})</p>
+                        <p><strong>Datos del Equipo:</strong> ${infoEquipo}</p>
+                        <p><strong>Fecha Calibración del Patrón:</strong> ${fechaCal}</p>
+                        <hr style="border:0; border-top:1px solid #ccc;">
+                        <pre style="background:#f8f9fa; padding:12px; font-family:monospace; font-size:12px; border-radius:4px;">${contenido}</pre>
+                        <hr style="border:0; border-top:1px solid #ccc;">
+                        <p style="text-align: center; font-size: 11px; color: #666;">Documento generado mediante plataforma clínica centralizada.</p>
                         <script>window.onload = function() { window.print(); }<\/script>
                     </body>
                 </html>
