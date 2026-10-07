@@ -8,8 +8,8 @@
     <!-- SDKs de Firebase -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateEmail, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateEmail, sendPasswordResetEmail, sendEmailVerification, deleteUser } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, setDoc, getDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         // Configuración de Firebase provista
         const firebaseConfig = {
@@ -59,7 +59,8 @@
                 const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
                 const user = userCredential.user;
 
-                // Guardar la configuración inicial del medidor en Firestore con el correo como ID
+                await sendEmailVerification(user);
+
                 await setDoc(doc(db, "usuarios_config", email), {
                     nombreUsuario: email.split('@')[0],
                     calibracion: fechaCal,
@@ -67,7 +68,9 @@
                     logoUrl: ""
                 });
 
-                alert("¡Cuenta registrada y configurada con éxito!");
+                alert("¡Cuenta registrada con éxito! Te hemos enviado un correo electrónico de verificación.");
+                await signOut(auth);
+
                 document.getElementById('registerCard').style.display = 'none';
                 document.getElementById('loginCard').style.display = 'block';
             } catch (error) {
@@ -92,6 +95,37 @@
             cerrarMenuLateral();
         };
 
+        window.eliminarCuentaCompleta = async function() {
+            const user = auth.currentUser;
+            if (!user) { alert("No hay una sesión activa."); return; }
+
+            if (confirm("⚠️ ADVERTENCIA: Esta acción eliminará permanentemente tu cuenta, configuración y todas tus pruebas guardadas en la nube. Esta acción no se puede deshacer. ¿Deseas continuar?")) {
+                try {
+                    const email = user.email;
+
+                    // 1. Eliminar documentos de pruebas en Firestore
+                    const q = query(collection(db, "pruebas_fluke"), where("usuario", "==", email));
+                    const querySnapshot = await getDocs(q);
+                    const batch = writeBatch(db);
+                    querySnapshot.forEach((docSnap) => {
+                        batch.delete(docSnap.ref);
+                    });
+                    await batch.commit();
+
+                    // 2. Eliminar documento de configuración en Firestore
+                    await deleteDoc(doc(db, "usuarios_config", email));
+
+                    // 3. Eliminar usuario de Firebase Authentication
+                    await deleteUser(user);
+
+                    localStorage.clear();
+                    alert("Tu cuenta y todos sus datos han sido eliminados por completo.");
+                } catch (error) {
+                    alert("Error al eliminar la cuenta (es posible que debas volver a iniciar sesión por seguridad): " + error.message);
+                }
+            }
+        };
+
         window.entrarComoInvitado = function() {
             document.getElementById('loginCard').style.display = "none";
             document.getElementById('registerCard').style.display = "none";
@@ -103,11 +137,11 @@
             document.getElementById('lblTipoFlukeSpan').textContent = "Fluke Impulse 7000DP";
             document.getElementById('otroPatronContainer').style.display = "none";
             document.getElementById('btnCambiarPass').style.display = "none";
+            document.getElementById('btnEliminarCuentaContainer').style.display = "none";
             
             localStorage.setItem('seccionActiva', 'setupMenu');
         };
 
-        // Escuchar cambios de estado de autenticación
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 document.getElementById('loginCard').style.display = "none";
@@ -115,6 +149,7 @@
                 document.getElementById('btnHamburger').style.display = "block";
                 document.getElementById('lblUsuarioActivo').textContent = user.email;
                 document.getElementById('btnCambiarPass').style.display = "block";
+                document.getElementById('btnEliminarCuentaContainer').style.display = "block";
                 
                 await cargarPerfilUsuario(user.email);
                 cargarHistorialCloud(user.email);
@@ -302,7 +337,6 @@
             }
         }
 
-        // Navegación del Menú Hamburguesa
         window.toggleMenu = function() {
             const sidebar = document.getElementById('sidebarMenu');
             const overlay = document.getElementById('menuOverlay');
@@ -670,7 +704,7 @@
     <!-- REGISTRO -->
     <div id="registerCard" class="auth-card" style="display: none;">
         <h2>Registro en la Nube</h2>
-        <p>Crea tu cuenta institucional y configura tu equipo medidor</p>
+        <p>Crea tu cuenta institucional y verifica tu correo</p>
         
         <div class="form-group">
             <label>Correo Electrónico *</label>
@@ -695,7 +729,6 @@
             </select>
         </div>
 
-        <!-- Campos adicionales si selecciona OTRO en registro -->
         <div id="regOtroPatronContainer" style="display: none; background: #e9ecef; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
             <label style="font-size:12px; font-weight:bold; color:#003366; margin-bottom:8px; display:block;">Especificar Patrón Personalizado:</label>
             <div class="form-group">
@@ -721,7 +754,7 @@
             <input type="date" id="regCalibDate" class="form-control" />
         </div>
 
-        <button class="btn-auth" onclick="window.registrarUsuario()" style="background-color: #28a745;">Completar Registro</button>
+        <button class="btn-auth" onclick="window.registrarUsuario()" style="background-color: #28a745;">Completar Registro y Verificar Correo</button>
         <div class="auth-switch">¿Ya tienes cuenta? <a onclick="document.getElementById('registerCard').style.display='none'; document.getElementById('loginCard').style.display='block';">Inicia sesión</a></div>
     </div>
 
@@ -839,9 +872,14 @@
                 <input type="email" id="cfgCorreo" class="form-control" placeholder="correo@hospital.com" />
             </div>
 
-            <div class="form-group" id="btnCambiarPass" style="margin-top: 15px; margin-bottom: 20px;">
+            <div class="form-group" id="btnCambiarPass" style="margin-top: 15px; margin-bottom: 15px;">
                 <label>Seguridad de la Cuenta</label>
                 <button type="button" onclick="window.enviarCorreoCambioPassword()" style="background-color: #ffc107; color: #333; padding: 9px 12px; width: 100%; border-radius: 6px; font-size: 14px; font-weight: bold; border: none; cursor: pointer;">🔐 Enviar enlace para cambiar contraseña por Correo</button>
+            </div>
+
+            <!-- Botón para eliminar cuenta por completo -->
+            <div class="form-group" id="btnEliminarCuentaContainer" style="margin-top: 10px; margin-bottom: 20px;">
+                <button type="button" onclick="window.eliminarCuentaCompleta()" style="background-color: #dc3545; color: white; padding: 9px 12px; width: 100%; border-radius: 6px; font-size: 14px; font-weight: bold; border: none; cursor: pointer;">🗑️ Eliminar Cuenta y Datos por Completo</button>
             </div>
 
             <div class="form-group">
