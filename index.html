@@ -123,7 +123,6 @@
         };
 
         async function guardarDatosCloudConfig(user, nombre, calib, logo, correo, pass) {
-            // Actualizar correo o contraseña en Auth si se solicita
             if (correo && correo !== user.email) {
                 await updateEmail(user, correo);
             }
@@ -131,7 +130,6 @@
                 await updatePassword(user, pass);
             }
 
-            // Guardar en Firestore
             await setDoc(doc(db, "usuarios_config", user.email), {
                 nombreUsuario: nombre,
                 calibracion: calib,
@@ -207,17 +205,18 @@
             const equipo = document.getElementById('eqNombre').value.trim();
             const marca = document.getElementById('eqMarca').value.trim();
             const modelo = document.getElementById('eqModelo').value.trim();
-            const control = document.getElementById('eqControl').value.trim();
+            const control = document.getElementById('eqControl').value.trim() || "N/A";
             const serie = document.getElementById('eqSerie').value.trim();
 
-            if (!equipo || !marca || !modelo || !control || !serie) {
-                alert("Por favor completa todos los datos del equipo médico antes de continuar.");
+            // Validación de campos obligatorios
+            if (!equipo || !marca || !modelo || !serie) {
+                alert("Por favor completa los campos obligatorios: Nombre, Marca, Modelo y Número de Serie / Referencia.");
                 return;
             }
 
             document.getElementById('setupMenu').style.display = "none";
             document.getElementById('appContainer').style.display = "block";
-            document.getElementById('lblInfoEquipo').textContent = `${equipo} | Marca: ${marca} | Modelo: ${modelo} | Control: ${control} | Serie: ${serie}`;
+            document.getElementById('lblInfoEquipo').textContent = `${equipo} | Marca: ${marca} | Modelo: ${modelo} | Control: ${control} | Serie/Ref: ${serie}`;
         };
 
         window.guardarPruebaActual = async function() {
@@ -503,23 +502,23 @@
         <p>Ingresa los datos del dispositivo bajo prueba</p>
         
         <div class="form-group">
-            <label>Nombre del Equipo</label>
+            <label>Nombre del Equipo *</label>
             <input type="text" id="eqNombre" class="form-control" placeholder="Ej. Desfibrilador Bifásico" />
         </div>
         <div class="form-group">
-            <label>Marca</label>
+            <label>Marca *</label>
             <input type="text" id="eqMarca" class="form-control" placeholder="Ej. Philips / Zoll / Mindray" />
         </div>
         <div class="form-group">
-            <label>Modelo</label>
+            <label>Modelo *</label>
             <input type="text" id="eqModelo" class="form-control" placeholder="Ej. BeneHeart D6" />
         </div>
         <div class="form-group">
-            <label>Número de Control</label>
-            <input type="text" id="eqControl" class="form-control" placeholder="Ej. NC-10492" />
+            <label>Número de Control (Opcional)</label>
+            <input type="text" id="eqControl" class="form-control" placeholder="Ej. NC-10492 (Opcional)" />
         </div>
         <div class="form-group">
-            <label>Número de Serie</label>
+            <label>Número de Serie / Referencia *</label>
             <input type="text" id="eqSerie" class="form-control" placeholder="Ej. SN-8839201" />
         </div>
 
