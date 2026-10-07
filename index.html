@@ -208,7 +208,6 @@
             const control = document.getElementById('eqControl').value.trim() || "N/A";
             const serie = document.getElementById('eqSerie').value.trim();
 
-            // Validación de campos obligatorios
             if (!equipo || !marca || !modelo || !serie) {
                 alert("Por favor completa los campos obligatorios: Nombre, Marca, Modelo y Número de Serie / Referencia.");
                 return;
@@ -679,34 +678,114 @@
         function limpiarPantalla() { document.getElementById('terminal').textContent = ""; }
 
         function generarPDF() {
-            const contenido = document.getElementById('terminal').textContent;
+            let contenidoBruto = document.getElementById('terminal').textContent;
+            
+            // Filtrar textos de conexión para dejar solo los resultados puros
+            let lineas = contenidoBruto.split('\n');
+            let lineasFiltradas = lineas.filter(linea => {
+                let l = linea.toLowerCase();
+                return !l.includes("esperando conexión") && 
+                       !l.includes("conexión establecida") && 
+                       !l.includes("conectado") && 
+                       !l.includes("desconectado");
+            });
+            let contenidoLimpio = lineasFiltradas.join('\n').trim();
+
             const fechaCal = document.getElementById('txtCalibDate').value || "No especificada";
-            const usuarioActivo = document.getElementById('lblUsuarioActivo').textContent;
+            const nombreResponsable = document.getElementById('cfgNombreUsuario').value.trim() || document.getElementById('lblUsuarioActivo').textContent;
             const infoEquipo = document.getElementById('lblInfoEquipo').textContent;
-            const nombreResponsable = document.getElementById('cfgNombreUsuario').value || usuarioActivo;
             const logoSrc = document.getElementById('cfgLogoPreview').src;
-            const mostrarLogo = (logoSrc && logoSrc.startsWith('data:image')) ? `<img src="${logoSrc}" style="max-height: 50px; float: right;">` : '';
+            const mostrarLogo = (logoSrc && logoSrc.startsWith('data:image')) ? `<img src="${logoSrc}" style="max-height: 55px; float: right;">` : '';
+            const fechaActual = new Date().toLocaleDateString();
 
             const ventanaImpresion = window.open('', '', 'width=900,height=700');
             ventanaImpresion.document.write(`
-                <html>
-                    <head><title>Reporte Fluke</title></head>
-                    <body style="font-family:Arial, sans-serif; padding:25px; font-size:13px; color:#333;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 2px solid #003366; padding-bottom:10px; margin-bottom:15px;">
+                <!DOCTYPE html>
+                <html lang="es">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Reporte Técnico - Fluke Impulse 7000DP</title>
+                        <style>
+                            @page {
+                                size: letter;
+                                margin: 15mm;
+                            }
+                            body {
+                                font-family: Arial, sans-serif;
+                                margin: 0;
+                                padding: 0;
+                                font-size: 12px;
+                                color: #333;
+                                line-height: 1.4;
+                            }
+                            .header-container {
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: center;
+                                border-bottom: 2px solid #003366;
+                                padding-bottom: 10px;
+                                margin-bottom: 15px;
+                            }
+                            h2 { margin: 0; color: #003366; font-size: 18px; }
+                            .meta-info {
+                                background: #f4f6f9;
+                                border: 1px solid #ddd;
+                                padding: 10px;
+                                border-radius: 4px;
+                                margin-bottom: 15px;
+                            }
+                            .meta-info p { margin: 4px 0; }
+                            pre {
+                                background: #fff;
+                                border: 1px solid #ccc;
+                                padding: 12px;
+                                font-family: 'Courier New', Courier, monospace;
+                                font-size: 11px;
+                                border-radius: 4px;
+                                white-space: pre-wrap;
+                                word-break: break-all;
+                                margin-bottom: 20px;
+                            }
+                            .footer {
+                                position: fixed;
+                                bottom: 0;
+                                left: 0;
+                                right: 0;
+                                font-size: 10px;
+                                color: #555;
+                                border-top: 1px solid #ccc;
+                                padding-top: 5px;
+                                display: flex;
+                                justify-content: space-between;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header-container">
                             <div>
-                                <h2 style="margin:0; color:#003366;">REPORTE TÉCNICO DE PRUEBA</h2>
-                                <small>Analizador Fluke Impulse 7000DP</small>
+                                <h2>REPORTE TÉCNICO DE PRUEBA</h2>
+                                <small>Analizador de Desfibriladores y Marcapasos</small>
                             </div>
                             <div>${mostrarLogo}</div>
                         </div>
-                        <p><strong>Responsable:</strong> ${nombreResponsable} (${usuarioActivo})</p>
-                        <p><strong>Datos del Equipo:</strong> ${infoEquipo}</p>
-                        <p><strong>Fecha Calibración del Patrón:</strong> ${fechaCal}</p>
-                        <hr style="border:0; border-top:1px solid #ccc;">
-                        <pre style="background:#f8f9fa; padding:12px; font-family:monospace; font-size:12px; border-radius:4px;">${contenido}</pre>
-                        <hr style="border:0; border-top:1px solid #ccc;">
-                        <p style="text-align: center; font-size: 11px; color: #666;">Documento generado mediante plataforma clínica centralizada.</p>
-                        <script>window.onload = function() { window.print(); }<\/script>
+
+                        <div class="meta-info">
+                            <p><strong>Responsable:</strong> ${nombreResponsable}</p>
+                            <p><strong>Datos del Equipo:</strong> ${infoEquipo}</p>
+                        </div>
+
+                        <pre>${contenidoLimpio}</pre>
+
+                        <div class="footer">
+                            <div>Patrón: Fluke Impulse 7000DP | Calibración Patrón: ${fechaCal}</div>
+                            <div>Fecha Emisión: ${fechaActual}</div>
+                        </div>
+
+                        <script>
+                            window.onload = function() {
+                                window.print();
+                            }
+                        <\/script>
                     </body>
                 </html>
             `);
