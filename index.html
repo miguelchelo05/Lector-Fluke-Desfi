@@ -3,7 +3,152 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Capturador Fluke Impulse 7000DP - Acceso</title>
+    <title>Capturador Fluke Impulse 7000DP - Cloud</title>
+    
+    <!-- SDKs de Firebase -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Configuración de Firebase provista
+        const firebaseConfig = {
+            apiKey: "AIzaSyAXH6FtCuAN7owKcYsoSe1fzqHNrpTmdr8",
+            authDomain: "flux-desfri.firebaseapp.com",
+            projectId: "flux-desfri",
+            storageBucket: "flux-desfri.firebasestorage.app",
+            messagingSenderId: "713015549742",
+            appId: "1:713015549742:web:155b48c2b0f4e63acce4bf",
+            measurementId: "G-MY2FHCW5L1"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Exponer funciones necesarias globalmente para los botones HTML
+        window.registrarUsuario = async function() {
+            const email = document.getElementById('regId').value.trim();
+            const pass = document.getElementById('regPass').value.trim();
+            if (!email || !pass) { alert("Completa todos los campos"); return; }
+            try {
+                await createUserWithEmailAndPassword(auth, email, pass);
+                alert("¡Cuenta creada con éxito!");
+                mostrarLogin();
+            } catch (error) {
+                alert("Error al registrar: " + error.message);
+            }
+        };
+
+        window.iniciarSesion = async function() {
+            const email = document.getElementById('loginId').value.trim();
+            const pass = document.getElementById('loginPass').value.trim();
+            if (!email || !pass) { alert("Ingresa correo y contraseña"); return; }
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
+            } catch (error) {
+                alert("Error al iniciar sesión: " + error.message);
+            }
+        };
+
+        window.cerrarSesion = async function() {
+            await signOut(auth);
+        };
+
+        window.entrarComoInvitado = function() {
+            document.getElementById('loginCard').style.display = "none";
+            document.getElementById('appContainer').style.display = "block";
+            document.getElementById('lblUsuarioActivo').textContent = "Invitado (Sin Historial)";
+            document.getElementById('historySection').style.display = "none";
+            document.getElementById('btnHistorial').style.display = "none";
+        };
+
+        // Escuchar cambios de estado de autenticación
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                document.getElementById('loginCard').style.display = "none";
+                document.getElementById('registerCard').style.display = "none";
+                document.getElementById('appContainer').style.display = "block";
+                document.getElementById('lblUsuarioActivo').textContent = user.email;
+                document.getElementById('historySection').style.display = "block";
+                document.getElementById('btnHistorial').style.display = "inline-block";
+                cargarHistorialCloud(user.email);
+            } else {
+                document.getElementById('appContainer').style.display = "none";
+                document.getElementById('loginCard').style.display = "block";
+            }
+        });
+
+        window.guardarPruebaActual = async function() {
+            const contenido = document.getElementById('terminal').textContent.trim();
+            const user = auth.currentUser;
+            if (!user || contenido.includes("Esperando conexión")) {
+                alert("No hay datos válidos para guardar.");
+                return;
+            }
+            try {
+                await addDoc(collection(db, "pruebas_fluke"), {
+                    usuario: user.email,
+                    fecha: new Date().toLocaleString(),
+                    datos: contenido,
+                    timestamp: Date.now()
+                });
+                alert("¡Prueba guardada en la nube con éxito!");
+                cargarHistorialCloud(user.email);
+            } catch (e) {
+                alert("Error al guardar en la nube: " + e.message);
+            }
+        };
+
+        async function cargarHistorialCloud(email) {
+            const listaHistorial = document.getElementById('listaHistorial');
+            listaHistorial.innerHTML = "Cargando historial desde la nube...";
+            try {
+                const q = query(collection(db, "pruebas_fluke"), where("usuario", "==", email));
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                    listaHistorial.innerHTML = "No hay pruebas guardadas en la nube.";
+                    return;
+                }
+
+                let html = "";
+                querySnapshot.forEach((docSnapshot) => {
+                    const p = docSnapshot.data();
+                    const docId = docSnapshot.id;
+                    html += `
+                        <div class="history-item">
+                            <span>🕒 <strong>${p.fecha}</strong></span>
+                            <div>
+                                <button onclick="window.cargarPruebaEnTerminal('${btoa(p.datos)}')" style="background-color: #007bff; padding: 5px 10px; font-size: 12px; color:white; border:none; border-radius:4px; cursor:pointer;">Cargar</button>
+                                <button onclick="window.eliminarPruebaCloud('${docId}', '${email}')" style="background-color: #dc3545; padding: 5px 10px; font-size: 12px; color:white; border:none; border-radius:4px; cursor:pointer;">Eliminar</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                listaHistorial.innerHTML = html;
+            } catch (e) {
+                listaHistorial.innerHTML = "Error al cargar historial.";
+            }
+        }
+
+        window.cargarPruebaEnTerminal = function(datosBase64) {
+            document.getElementById('terminal').textContent = atob(datosBase64);
+            alert("Prueba cargada en la terminal.");
+        };
+
+        window.eliminarPruebaCloud = async function(docId, email) {
+            if (confirm("¿Estás seguro de eliminar este registro de la nube?")) {
+                try {
+                    await deleteDoc(doc(db, "pruebas_fluke", docId));
+                    cargarHistorialCloud(email);
+                } catch (e) {
+                    alert("Error al eliminar: " + e.message);
+                }
+            }
+        };
+    </script>
+
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -16,8 +161,6 @@
             align-items: center;
             min-height: 100vh;
         }
-
-        /* CONTENEDOR DE AUTENTICACIÓN (LOGIN / REGISTRO) */
         .auth-card {
             background: #fff;
             padding: 35px;
@@ -27,89 +170,19 @@
             max-width: 400px;
             box-sizing: border-box;
         }
-
-        .auth-card h2 {
-            color: #003366;
-            margin-top: 0;
-            margin-bottom: 8px;
-            text-align: center;
-        }
-
-        .auth-card p {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 25px;
-            text-align: center;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            font-size: 13px;
-            font-weight: bold;
-            margin-bottom: 5px;
-            color: #444;
-        }
-
-        .form-control {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-
-        .btn-auth {
-            width: 100%;
-            padding: 11px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 15px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-
+        .auth-card h2 { color: #003366; margin-top: 0; margin-bottom: 8px; text-align: center; }
+        .auth-card p { color: #666; font-size: 14px; margin-bottom: 25px; text-align: center; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #444; }
+        .form-control { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+        .btn-auth { width: 100%; padding: 11px; background-color: #007bff; color: white; border: none; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .btn-auth:hover { background-color: #0056b3; }
-
-        .btn-guest-login {
-            width: 100%;
-            padding: 11px;
-            background-color: #6c757d;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 15px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-
+        .btn-guest-login { width: 100%; padding: 11px; background-color: #6c757d; color: white; border: none; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .btn-guest-login:hover { background-color: #5a6268; }
-
-        .auth-switch {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 13px;
-            color: #666;
-        }
-
-        .auth-switch a {
-            color: #007bff;
-            text-decoration: none;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
+        .auth-switch { text-align: center; margin-top: 20px; font-size: 13px; color: #666; }
+        .auth-switch a { color: #007bff; text-decoration: none; font-weight: bold; cursor: pointer; }
         .auth-switch a:hover { text-decoration: underline; }
 
-        /* CONTENEDOR DE LA APLICACIÓN PRINCIPAL */
         #appContainer {
             display: none;
             max-width: 850px;
@@ -120,171 +193,73 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             margin: 20px auto;
         }
-
-        .top-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #e9ecef;
-            padding: 10px 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-
-        h1 {
-            color: #003366;
-            font-size: 22px;
-            margin-top: 0;
-        }
-
-        .status {
-            font-weight: bold;
-            margin-bottom: 15px;
-        }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; background: #e9ecef; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 14px; }
+        h1 { color: #003366; font-size: 22px; margin-top: 0; }
+        .status { font-weight: bold; margin-bottom: 15px; }
         .status.disconnected { color: #d9534f; }
         .status.connected { color: #5cb85c; }
-
-        .calibration-box {
-            background-color: #f8f9fa;
-            border: 1px solid #ddd;
-            padding: 12px 15px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        .calibration-box input {
-            padding: 6px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-
-        .buttons {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-bottom: 20px;
-        }
-
-        button {
-            padding: 10px 15px;
-            font-size: 14px;
-            font-weight: bold;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            color: #fff;
-        }
+        .calibration-box { background-color: #f8f9fa; border: 1px solid #ddd; padding: 12px 15px; border-radius: 4px; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: bold; }
+        .calibration-box input { padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        .buttons { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+        button { padding: 10px 15px; font-size: 14px; font-weight: bold; border: none; border-radius: 4px; cursor: pointer; color: #fff; }
         #btnConectar { background-color: #007bff; }
         #btnDesconectar { background-color: #6c757d; }
         #btnLimpiar { background-color: #6c757d; }
         #btnPdf { background-color: #28a745; }
-        #btnHistorial { background-color: #ffc107; color: #333; display: none; }
-        button:hover { opacity: 0.9; }
-
-        #terminal {
-            width: 100%;
-            height: 280px;
-            background-color: #1e1e1e;
-            color: #00ff00;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 13px;
-            padding: 15px;
-            box-sizing: border-box;
-            border-radius: 4px;
-            white-space: pre-wrap;
-            overflow-y: auto;
-            word-break: break-all;
-            margin-bottom: 15px;
-        }
-
-        #historySection {
-            margin-top: 20px;
-            border-top: 2px solid #ddd;
-            padding-top: 15px;
-            display: none;
-        }
-        .history-item {
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 8px;
-            border-left: 4px solid #007bff;
-            font-size: 13px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+        #btnHistorial { background-color: #ffc107; color: #333; }
+        #terminal { width: 100%; height: 280px; background-color: #1e1e1e; color: #00ff00; font-family: 'Courier New', Courier, monospace; font-size: 13px; padding: 15px; box-sizing: border-box; border-radius: 4px; white-space: pre-wrap; overflow-y: auto; word-break: break-all; margin-bottom: 15px; }
+        #historySection { margin-top: 20px; border-top: 2px solid #ddd; padding-top: 15px; }
+        .history-item { background: #f8f9fa; padding: 10px; border-radius: 4px; margin-bottom: 8px; border-left: 4px solid #007bff; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
     </style>
 </head>
 <body>
 
-    <!-- 1. PANTALLA DE INICIO DE SESIÓN -->
+    <!-- LOGIN -->
     <div id="loginCard" class="auth-card">
-        <h2>Iniciar Sesión</h2>
-        <p>Para hospitales e instituciones con control de historiales</p>
-        
+        <h2>Iniciar Sesión (Nube)</h2>
+        <p>Hospitales e Instituciones</p>
         <div class="form-group">
-            <label>Correo electrónico o Teléfono</label>
-            <input type="text" id="loginId" class="form-control" placeholder="ejemplo@hospital.com" />
+            <label>Correo Electrónico</label>
+            <input type="email" id="loginId" class="form-control" placeholder="ejemplo@hospital.com" />
         </div>
         <div class="form-group">
             <label>Contraseña</label>
             <input type="password" id="loginPass" class="form-control" placeholder="••••••••" />
         </div>
-
-        <button class="btn-auth" onclick="iniciarSesion()">Entrar</button>
-        <button class="btn-guest-login" onclick="entrarComoInvitado()">Continuar como Invitado (Sin cuenta)</button>
-
-        <div class="auth-switch">
-            ¿Institución nueva? <a onclick="mostrarRegistro()">Regístrate aquí</a>
-        </div>
+        <button class="btn-auth" onclick="window.iniciarSesion()">Entrar</button>
+        <button class="btn-guest-login" onclick="window.entrarComoInvitado()">Continuar como Invitado</button>
+        <div class="auth-switch">¿Institución nueva? <a onclick="document.getElementById('loginCard').style.display='none'; document.getElementById('registerCard').style.display='block';">Regístrate aquí</a></div>
     </div>
 
-    <!-- 2. PANTALLA DE REGISTRO INSTITUCIONAL -->
+    <!-- REGISTRO -->
     <div id="registerCard" class="auth-card" style="display: none;">
-        <h2>Registro Institucional</h2>
-        <p>Crea una cuenta para guardar historiales de pruebas</p>
-        
+        <h2>Registro en la Nube</h2>
+        <p>Crea tu cuenta institucional</p>
         <div class="form-group">
-            <label>Nombre del Hospital / Institución o Técnico</label>
-            <input type="text" id="regNombre" class="form-control" placeholder="Ej. Hospital General" />
-        </div>
-        <div class="form-group">
-            <label>Correo electrónico o Teléfono</label>
-            <input type="text" id="regId" class="form-control" placeholder="ejemplo@correo.com" />
+            <label>Correo Electrónico</label>
+            <input type="email" id="regId" class="form-control" placeholder="ejemplo@correo.com" />
         </div>
         <div class="form-group">
             <label>Contraseña</label>
             <input type="password" id="regPass" class="form-control" placeholder="••••••••" />
         </div>
-
-        <button class="btn-auth" onclick="registrarUsuario()" style="background-color: #28a745;">Registrarse</button>
-
-        <div class="auth-switch">
-            ¿Ya tienes cuenta? <a onclick="mostrarLogin()">Inicia sesión</a>
-        </div>
+        <button class="btn-auth" onclick="window.registrarUsuario()" style="background-color: #28a745;">Registrarse</button>
+        <div class="auth-switch">¿Ya tienes cuenta? <a onclick="document.getElementById('registerCard').style.display='none'; document.getElementById('loginCard').style.display='block';">Inicia sesión</a></div>
     </div>
 
-    <!-- 3. APLICACIÓN PRINCIPAL -->
+    <!-- APP PRINCIPAL -->
     <div id="appContainer">
         <div class="top-bar">
-            <div>👤 Sesión: <strong id="lblUsuarioActivo"></strong></div>
-            <button onclick="cerrarSesion()" style="background-color: #dc3545; padding: 5px 10px; font-size: 12px;">Cerrar Sesión / Salir</button>
+            <div>👤 Cuenta Cloud: <strong id="lblUsuarioActivo"></strong></div>
+            <button onclick="window.cerrarSesion()" style="background-color: #dc3545; padding: 5px 10px; font-size: 12px;">Cerrar Sesión</button>
         </div>
 
         <h1>Capturador Fluke Impulse 7000DP</h1>
         <div class="status">Estado: <span id="lblEstado" class="status disconnected">Desconectado</span></div>
 
-        <!-- Fecha de calibración persistente -->
         <div class="calibration-box">
             <label for="txtCalibDate">📅 Fecha de Calibración del Fluke:</label>
-            <input type="date" id="txtCalibDate" onchange="guardarFechaCalibracion()">
+            <input type="date" id="txtCalibDate">
         </div>
 
         <div class="buttons">
@@ -292,174 +267,37 @@
             <button id="btnDesconectar" onclick="desconectarPuerto()" disabled>Desconectar</button>
             <button id="btnLimpiar" onclick="limpiarPantalla()">Limpiar Pantalla</button>
             <button id="btnPdf" onclick="generarPDF()">2. Generar PDF / Imprimir</button>
-            <button id="btnHistorial" onclick="guardarPruebaActual()">💾 Guardar en Historial</button>
+            <button id="btnHistorial" onclick="window.guardarPruebaActual()">💾 Guardar en la Nube</button>
         </div>
 
         <div id="terminal">Esperando conexión con el equipo Fluke...</div>
 
-        <!-- HISTORIAL DE PRUEBAS (Solo para cuentas reales) -->
         <div id="historySection">
-            <h3>📁 Historial de Pruebas Institucional</h3>
-            <div id="listaHistorial">No hay pruebas guardadas aún.</div>
+            <h3>📁 Historial de Pruebas (Sincronizado en la Nube)</h3>
+            <div id="listaHistorial">Cargando...</div>
         </div>
     </div>
 
     <script>
-        let port;
-        let reader;
-        let inputStreamClosed;
-        let keepReading = false;
-
-        const loginCard = document.getElementById('loginCard');
-        const registerCard = document.getElementById('registerCard');
-        const appContainer = document.getElementById('appContainer');
-
-        const loginId = document.getElementById('loginId');
-        const loginPass = document.getElementById('loginPass');
-
-        const regNombre = document.getElementById('regNombre');
-        const regId = document.getElementById('regId');
-        const regPass = document.getElementById('regPass');
-
-        const lblUsuarioActivo = document.getElementById('lblUsuarioActivo');
-        const historySection = document.getElementById('historySection');
-        const btnHistorial = document.getElementById('btnHistorial');
-        const listaHistorial = document.getElementById('listaHistorial');
-        const terminal = document.getElementById('terminal');
-        const lblEstado = document.getElementById('lblEstado');
-        const btnConectar = document.getElementById('btnConectar');
-        const btnDesconectar = document.getElementById('btnDesconectar');
-        const txtCalibDate = document.getElementById('txtCalibDate');
-
-        window.onload = function() {
-            const fechaGuardada = localStorage.getItem("fluke_fecha_calibracion");
-            if (fechaGuardada) {
-                txtCalibDate.value = fechaGuardada;
-            } else {
-                txtCalibDate.value = "2026-01-15";
-            }
-
-            const sesionActiva = localStorage.getItem("fluke_sesion_activa");
-            if (sesionActiva) {
-                const esInvitado = sesionActiva === "Invitado";
-                abrirApp(sesionActiva, !esInvitado);
-            }
-        };
-
-        function mostrarRegistro() {
-            loginCard.style.display = "none";
-            registerCard.style.display = "block";
-        }
-
-        function mostrarLogin() {
-            registerCard.style.display = "none";
-            loginCard.style.display = "block";
-        }
-
-        function registrarUsuario() {
-            const nombre = regNombre.value.trim();
-            const id = regId.value.trim().toLowerCase();
-            const pass = regPass.value.trim();
-
-            if (!nombre || !id || !pass) {
-                alert("Por favor completa todos los campos.");
-                return;
-            }
-
-            let usuarios = JSON.parse(localStorage.getItem("fluke_usuarios_db") || "{}");
-            if (usuarios[id]) {
-                alert("Este correo o teléfono ya está registrado.");
-                return;
-            }
-
-            usuarios[id] = { nombre: nombre, pass: pass };
-            localStorage.setItem("fluke_usuarios_db", JSON.stringify(usuarios));
-
-            alert("¡Cuenta registrada con éxito! Ya puedes iniciar sesión.");
-            regNombre.value = "";
-            regId.value = "";
-            regPass.value = "";
-            mostrarLogin();
-        }
-
-        function iniciarSesion() {
-            const id = loginId.value.trim().toLowerCase();
-            const pass = loginPass.value.trim();
-
-            if (!id || !pass) {
-                alert("Ingresa tu correo/teléfono y contraseña.");
-                return;
-            }
-
-            let usuarios = JSON.parse(localStorage.getItem("fluke_usuarios_db") || "{}");
-
-            if (!usuarios[id] || usuarios[id].pass !== pass) {
-                alert("Datos incorrectos. Verifica tu usuario o contraseña.");
-                return;
-            }
-
-            localStorage.setItem("fluke_sesion_activa", usuarios[id].nombre);
-            loginId.value = "";
-            loginPass.value = "";
-            abrirApp(usuarios[id].nombre, true);
-        }
-
-        function entrarComoInvitado() {
-            localStorage.setItem("fluke_sesion_activa", "Invitado");
-            abrirApp("Invitado", false);
-        }
-
-        function abrirApp(nombreUsuario, habilitarHistorial) {
-            loginCard.style.display = "none";
-            registerCard.style.display = "none";
-            appContainer.style.display = "block";
-            lblUsuarioActivo.textContent = nombreUsuario;
-
-            if (habilitarHistorial) {
-                historySection.style.display = "block";
-                btnHistorial.style.display = "inline-block";
-                cargarHistorial();
-            } else {
-                historySection.style.display = "none";
-                btnHistorial.style.display = "none";
-            }
-        }
-
-        function cerrarSesion() {
-            localStorage.removeItem("fluke_sesion_activa");
-            appContainer.style.display = "none";
-            loginCard.style.display = "block";
-        }
-
-        function guardarFechaCalibracion() {
-            localStorage.setItem("fluke_fecha_calibracion", txtCalibDate.value);
-        }
+        let port, reader, inputStreamClosed, keepReading = false;
 
         async function conectarPuerto() {
             if (!("serial" in navigator)) {
                 alert("Tu navegador no soporta la Web Serial API. Usa Google Chrome o Edge.");
                 return;
             }
-
             try {
-                port = await navigator.serial.requestPort({
-                    filters: [{ usbVendorId: 0x0403, usbProductId: 0x6001 }]
-                });
-
+                port = await navigator.serial.requestPort({ filters: [{ usbVendorId: 0x0403, usbProductId: 0x6001 }] });
                 await port.open({ baudRate: 115200 });
-
-                lblEstado.textContent = "Conectado";
-                lblEstado.className = "status connected";
-                btnConectar.disabled = true;
-                btnDesconectar.disabled = false;
-                terminal.textContent = "Conexión establecida a 115200 baudios. Transfiere los datos desde el Impulse 7000DP...\n\n";
-
+                document.getElementById('lblEstado').textContent = "Conectado";
+                document.getElementById('lblEstado').className = "status connected";
+                document.getElementById('btnConectar').disabled = true;
+                document.getElementById('btnDesconectar').disabled = false;
+                document.getElementById('terminal').textContent = "Conexión establecida a 115200 baudios...\n\n";
                 keepReading = true;
                 leerDatos();
             } catch (error) {
-                console.error("Error al conectar:", error);
-                lblEstado.textContent = "Error de conexión";
-                lblEstado.className = "status disconnected";
+                console.error(error);
             }
         }
 
@@ -467,21 +305,18 @@
             const textDecoder = new TextDecoderStream();
             inputStreamClosed = port.readable.pipeTo(textDecoder.writable);
             reader = textDecoder.readable.getReader();
-
             try {
                 while (keepReading) {
                     const { value, done } = await reader.read();
                     if (done) break;
                     if (value) {
-                        terminal.textContent += value;
-                        terminal.scrollTop = terminal.scrollHeight;
+                        const term = document.getElementById('terminal');
+                        term.textContent += value;
+                        term.scrollTop = term.scrollHeight;
                     }
                 }
-            } catch (error) {
-                console.error("Error durante la lectura:", error);
-            } finally {
-                reader.releaseLock();
-            }
+            } catch (error) { console.error(error); }
+            finally { reader.releaseLock(); }
         }
 
         async function desconectarPuerto() {
@@ -490,120 +325,30 @@
                 if (reader) await reader.cancel();
                 if (inputStreamClosed) await inputStreamClosed.catch(() => {});
                 if (port) await port.close();
-            } catch (error) {
-                console.error("Error al cerrar el puerto:", error);
-            }
-
-            lblEstado.textContent = "Desconectado";
-            lblEstado.className = "status disconnected";
-            btnConectar.disabled = false;
-            btnDesconectar.disabled = true;
-            terminal.textContent += "\n[Puerto desconectado]";
+            } catch (error) { console.error(error); }
+            document.getElementById('lblEstado').textContent = "Desconectado";
+            document.getElementById('lblEstado').className = "status disconnected";
+            document.getElementById('btnConectar').disabled = false;
+            document.getElementById('btnDesconectar').disabled = true;
         }
 
-        function limpiarPantalla() {
-            terminal.textContent = "";
-        }
-
-        function guardarPruebaActual() {
-            const contenido = terminal.textContent.trim();
-            if (!contenido || contenido.includes("Esperando conexión")) {
-                alert("No hay datos válidos en la terminal para guardar.");
-                return;
-            }
-
-            const usuarioActual = localStorage.getItem("fluke_sesion_activa");
-            const fechaHora = new Date().toLocaleString();
-            
-            const nuevaPrueba = {
-                id: Date.now(),
-                usuario: usuarioActual,
-                fecha: fechaHora,
-                datos: contenido
-            };
-
-            let historial = JSON.parse(localStorage.getItem("fluke_historial") || "[]");
-            historial.unshift(nuevaPrueba);
-            localStorage.setItem("fluke_historial", JSON.stringify(historial));
-
-            cargarHistorial();
-            alert("¡Prueba guardada en el historial de la institución!");
-        }
-
-        function cargarHistorial() {
-            let historial = JSON.parse(localStorage.getItem("fluke_historial") || "[]");
-            const usuarioActual = localStorage.getItem("fluke_sesion_activa");
-            const misPruebas = historial.filter(p => p.usuario === usuarioActual);
-
-            if (misPruebas.length === 0) {
-                listaHistorial.innerHTML = "No hay pruebas guardadas aún.";
-                return;
-            }
-
-            let html = "";
-            misPruebas.forEach(p => {
-                html += `
-                    <div class="history-item">
-                        <span>🕒 <strong>${p.fecha}</strong></span>
-                        <div>
-                            <button onclick="cargarPruebaEnTerminal(${p.id})" style="background-color: #007bff; padding: 5px 10px; font-size: 12px;">Cargar</button>
-                            <button onclick="eliminarPrueba(${p.id})" style="background-color: #dc3545; padding: 5px 10px; font-size: 12px;">Eliminar</button>
-                        </div>
-                    </div>
-                `;
-            });
-            listaHistorial.innerHTML = html;
-        }
-
-        function cargarPruebaEnTerminal(id) {
-            let historial = JSON.parse(localStorage.getItem("fluke_historial") || "[]");
-            const prueba = historial.find(p => p.id === id);
-            if (prueba) {
-                terminal.textContent = prueba.datos;
-                alert("Prueba cargada en la terminal.");
-            }
-        }
-
-        function eliminarPrueba(id) {
-            let historial = JSON.parse(localStorage.getItem("fluke_historial") || "[]");
-            historial = historial.filter(p => p.id !== id);
-            localStorage.setItem("fluke_historial", JSON.stringify(historial));
-            cargarHistorial();
-        }
+        function limpiarPantalla() { document.getElementById('terminal').textContent = ""; }
 
         function generarPDF() {
-            const contenido = terminal.textContent;
-            const fechaCalibracion = txtCalibDate.value || "No especificada";
-            const fechaActual = new Date().toLocaleString();
-            const usuarioActual = localStorage.getItem("fluke_sesion_activa") || "Invitado";
+            const contenido = document.getElementById('terminal').textContent;
+            const fechaCal = document.getElementById('txtCalibDate').value || "No especificada";
+            const usuarioActivo = document.getElementById('lblUsuarioActivo').textContent;
 
             const ventanaImpresion = window.open('', '', 'width=900,height=700');
             ventanaImpresion.document.write(`
                 <html>
-                    <head>
-                        <title>Reporte Fluke Impulse 7000DP</title>
-                        <style>
-                            body { font-family: 'Courier New', Courier, monospace; padding: 20px; font-size: 12px; display: flex; flex-direction: column; min-height: 90vh; }
-                            .header-info { margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; }
-                            .report-body { flex: 1; white-space: pre-wrap; }
-                            .footer { margin-top: 30px; border-top: 1px solid #333; padding-top: 10px; font-size: 11px; color: #555; }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="header-info">
-                            <strong>INGENIERÍA CLÍNICA - REPORTE DE PRUEBA</strong><br>
-                            Institución / Técnico: <strong>${usuarioActual}</strong>
-                        </div>
-                        <div class="report-body">${contenido}</div>
-                        <div class="footer">
-                            <strong>INFORMACIÓN METROLÓGICA DEL EQUIPO PATRÓN:</strong><br>
-                            Analizador de Desfibrilador: Fluke Biomedical Impulse 7000DP<br>
-                            Fecha de Última Calibración del Patrón: <strong>${fechaCalibracion}</strong><br>
-                            Fecha de Emisión del Reporte: ${fechaActual}
-                        </div>
-                        <script>
-                            window.onload = function() { window.print(); }
-                        <\/script>
+                    <head><title>Reporte Fluke</title></head>
+                    <body style="font-family:monospace; padding:20px; font-size:12px;">
+                        <strong>REPORTE FLUKE IMPULSE 7000DP</strong><br>
+                        Usuario: ${usuarioActivo}<br><hr>
+                        <pre>${contenido}</pre><hr>
+                        Fecha Calibración Patrón: ${fechaCal}
+                        <script>window.onload = function() { window.print(); }<\/script>
                     </body>
                 </html>
             `);
