@@ -78,6 +78,21 @@
 
         .btn-auth:hover { background-color: #0056b3; }
 
+        .btn-guest-login {
+            width: 100%;
+            padding: 11px;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .btn-guest-login:hover { background-color: #5a6268; }
+
         .auth-switch {
             text-align: center;
             margin-top: 20px;
@@ -94,7 +109,7 @@
 
         .auth-switch a:hover { text-decoration: underline; }
 
-        /* CONTENEDOR DE LA APLICACIÓN PRINCIPAL (Oculto hasta iniciar sesión) */
+        /* CONTENEDOR DE LA APLICACIÓN PRINCIPAL */
         #appContainer {
             display: none;
             max-width: 850px;
@@ -169,7 +184,7 @@
         #btnDesconectar { background-color: #6c757d; }
         #btnLimpiar { background-color: #6c757d; }
         #btnPdf { background-color: #28a745; }
-        #btnHistorial { background-color: #ffc107; color: #333; }
+        #btnHistorial { background-color: #ffc107; color: #333; display: none; }
         button:hover { opacity: 0.9; }
 
         #terminal {
@@ -192,6 +207,7 @@
             margin-top: 20px;
             border-top: 2px solid #ddd;
             padding-top: 15px;
+            display: none;
         }
         .history-item {
             background: #f8f9fa;
@@ -211,11 +227,11 @@
     <!-- 1. PANTALLA DE INICIO DE SESIÓN -->
     <div id="loginCard" class="auth-card">
         <h2>Iniciar Sesión</h2>
-        <p>Ingresa tus datos para acceder al sistema</p>
+        <p>Para hospitales e instituciones con control de historiales</p>
         
         <div class="form-group">
             <label>Correo electrónico o Teléfono</label>
-            <input type="text" id="loginId" class="form-control" placeholder="ejemplo@correo.com" />
+            <input type="text" id="loginId" class="form-control" placeholder="ejemplo@hospital.com" />
         </div>
         <div class="form-group">
             <label>Contraseña</label>
@@ -223,20 +239,21 @@
         </div>
 
         <button class="btn-auth" onclick="iniciarSesion()">Entrar</button>
+        <button class="btn-guest-login" onclick="entrarComoInvitado()">Continuar como Invitado (Sin cuenta)</button>
 
         <div class="auth-switch">
-            ¿Eres nuevo? <a onclick="mostrarRegistro()">Regístrate aquí</a>
+            ¿Institución nueva? <a onclick="mostrarRegistro()">Regístrate aquí</a>
         </div>
     </div>
 
-    <!-- 2. PANTALLA DE REGISTRO -->
+    <!-- 2. PANTALLA DE REGISTRO INSTITUCIONAL -->
     <div id="registerCard" class="auth-card" style="display: none;">
-        <h2>Crear Cuenta</h2>
-        <p>Regístrate para guardar tus historiales de pruebas</p>
+        <h2>Registro Institucional</h2>
+        <p>Crea una cuenta para guardar historiales de pruebas</p>
         
         <div class="form-group">
-            <label>Nombre del Técnico</label>
-            <input type="text" id="regNombre" class="form-control" placeholder="Tu Nombre Completo" />
+            <label>Nombre del Hospital / Institución o Técnico</label>
+            <input type="text" id="regNombre" class="form-control" placeholder="Ej. Hospital General" />
         </div>
         <div class="form-group">
             <label>Correo electrónico o Teléfono</label>
@@ -250,15 +267,15 @@
         <button class="btn-auth" onclick="registrarUsuario()" style="background-color: #28a745;">Registrarse</button>
 
         <div class="auth-switch">
-            ¿Ya tienes una cuenta? <a onclick="mostrarLogin()">Inicia sesión</a>
+            ¿Ya tienes cuenta? <a onclick="mostrarLogin()">Inicia sesión</a>
         </div>
     </div>
 
-    <!-- 3. APLICACIÓN PRINCIPAL (Oculta hasta loguearse) -->
+    <!-- 3. APLICACIÓN PRINCIPAL -->
     <div id="appContainer">
         <div class="top-bar">
-            <div>👤 Cuenta: <strong id="lblUsuarioActivo"></strong></div>
-            <button onclick="cerrarSesion()" style="background-color: #dc3545; padding: 5px 10px; font-size: 12px;">Cerrar Sesión</button>
+            <div>👤 Sesión: <strong id="lblUsuarioActivo"></strong></div>
+            <button onclick="cerrarSesion()" style="background-color: #dc3545; padding: 5px 10px; font-size: 12px;">Cerrar Sesión / Salir</button>
         </div>
 
         <h1>Capturador Fluke Impulse 7000DP</h1>
@@ -275,14 +292,14 @@
             <button id="btnDesconectar" onclick="desconectarPuerto()" disabled>Desconectar</button>
             <button id="btnLimpiar" onclick="limpiarPantalla()">Limpiar Pantalla</button>
             <button id="btnPdf" onclick="generarPDF()">2. Generar PDF / Imprimir</button>
-            <button id="btnHistorial" onclick="guardarPruebaActual()" style="background-color: #ffc107; color: #333;">💾 Guardar en Historial</button>
+            <button id="btnHistorial" onclick="guardarPruebaActual()">💾 Guardar en Historial</button>
         </div>
 
         <div id="terminal">Esperando conexión con el equipo Fluke...</div>
 
-        <!-- HISTORIAL DE PRUEBAS -->
+        <!-- HISTORIAL DE PRUEBAS (Solo para cuentas reales) -->
         <div id="historySection">
-            <h3>📁 Historial de Pruebas de tu Cuenta</h3>
+            <h3>📁 Historial de Pruebas Institucional</h3>
             <div id="listaHistorial">No hay pruebas guardadas aún.</div>
         </div>
     </div>
@@ -305,6 +322,8 @@
         const regPass = document.getElementById('regPass');
 
         const lblUsuarioActivo = document.getElementById('lblUsuarioActivo');
+        const historySection = document.getElementById('historySection');
+        const btnHistorial = document.getElementById('btnHistorial');
         const listaHistorial = document.getElementById('listaHistorial');
         const terminal = document.getElementById('terminal');
         const lblEstado = document.getElementById('lblEstado');
@@ -312,7 +331,6 @@
         const btnDesconectar = document.getElementById('btnDesconectar');
         const txtCalibDate = document.getElementById('txtCalibDate');
 
-        // Al cargar, verifica si ya hay sesión iniciada
         window.onload = function() {
             const fechaGuardada = localStorage.getItem("fluke_fecha_calibracion");
             if (fechaGuardada) {
@@ -323,7 +341,8 @@
 
             const sesionActiva = localStorage.getItem("fluke_sesion_activa");
             if (sesionActiva) {
-                abrirApp(sesionActiva);
+                const esInvitado = sesionActiva === "Invitado";
+                abrirApp(sesionActiva, !esInvitado);
             }
         };
 
@@ -337,7 +356,6 @@
             loginCard.style.display = "block";
         }
 
-        // Registrar una nueva cuenta
         function registrarUsuario() {
             const nombre = regNombre.value.trim();
             const id = regId.value.trim().toLowerCase();
@@ -354,18 +372,16 @@
                 return;
             }
 
-            // Guardar usuario en la base de datos local
             usuarios[id] = { nombre: nombre, pass: pass };
             localStorage.setItem("fluke_usuarios_db", JSON.stringify(usuarios));
 
-            alert("¡Cuenta creada con éxito! Ahora inicia sesión.");
+            alert("¡Cuenta registrada con éxito! Ya puedes iniciar sesión.");
             regNombre.value = "";
             regId.value = "";
             regPass.value = "";
             mostrarLogin();
         }
 
-        // Iniciar sesión con validación real
         function iniciarSesion() {
             const id = loginId.value.trim().toLowerCase();
             const pass = loginPass.value.trim();
@@ -382,19 +398,31 @@
                 return;
             }
 
-            // Guardar sesión activa con el nombre del usuario
             localStorage.setItem("fluke_sesion_activa", usuarios[id].nombre);
             loginId.value = "";
             loginPass.value = "";
-            abrirApp(usuarios[id].nombre);
+            abrirApp(usuarios[id].nombre, true);
         }
 
-        function abrirApp(nombreUsuario) {
+        function entrarComoInvitado() {
+            localStorage.setItem("fluke_sesion_activa", "Invitado");
+            abrirApp("Invitado", false);
+        }
+
+        function abrirApp(nombreUsuario, habilitarHistorial) {
             loginCard.style.display = "none";
             registerCard.style.display = "none";
             appContainer.style.display = "block";
             lblUsuarioActivo.textContent = nombreUsuario;
-            cargarHistorial();
+
+            if (habilitarHistorial) {
+                historySection.style.display = "block";
+                btnHistorial.style.display = "inline-block";
+                cargarHistorial();
+            } else {
+                historySection.style.display = "none";
+                btnHistorial.style.display = "none";
+            }
         }
 
         function cerrarSesion() {
@@ -484,7 +512,7 @@
                 return;
             }
 
-            const usuarioActual = localStorage.getItem("fluke_sesion_activa") || "Técnico";
+            const usuarioActual = localStorage.getItem("fluke_sesion_activa");
             const fechaHora = new Date().toLocaleString();
             
             const nuevaPrueba = {
@@ -499,7 +527,7 @@
             localStorage.setItem("fluke_historial", JSON.stringify(historial));
 
             cargarHistorial();
-            alert("¡Prueba guardada en tu historial!");
+            alert("¡Prueba guardada en el historial de la institución!");
         }
 
         function cargarHistorial() {
@@ -508,7 +536,7 @@
             const misPruebas = historial.filter(p => p.usuario === usuarioActual);
 
             if (misPruebas.length === 0) {
-                listaHistorial.innerHTML = "No hay pruebas guardadas en tu cuenta aún.";
+                listaHistorial.innerHTML = "No hay pruebas guardadas aún.";
                 return;
             }
 
@@ -547,7 +575,7 @@
             const contenido = terminal.textContent;
             const fechaCalibracion = txtCalibDate.value || "No especificada";
             const fechaActual = new Date().toLocaleString();
-            const usuarioActual = localStorage.getItem("fluke_sesion_activa") || "Técnico General";
+            const usuarioActual = localStorage.getItem("fluke_sesion_activa") || "Invitado";
 
             const ventanaImpresion = window.open('', '', 'width=900,height=700');
             ventanaImpresion.document.write(`
@@ -564,7 +592,7 @@
                     <body>
                         <div class="header-info">
                             <strong>INGENIERÍA CLÍNICA - REPORTE DE PRUEBA</strong><br>
-                            Técnico / Evaluador: <strong>${usuarioActual}</strong>
+                            Institución / Técnico: <strong>${usuarioActual}</strong>
                         </div>
                         <div class="report-body">${contenido}</div>
                         <div class="footer">
