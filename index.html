@@ -9,7 +9,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         // Configuración de Firebase provista
         const firebaseConfig = {
@@ -26,7 +26,7 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // Exponer funciones necesarias globalmente para los botones HTML
+        // Funciones de Autenticación
         window.registrarUsuario = async function() {
             const email = document.getElementById('regId').value.trim();
             const pass = document.getElementById('regPass').value.trim();
@@ -34,7 +34,8 @@
             try {
                 await createUserWithEmailAndPassword(auth, email, pass);
                 alert("¡Cuenta creada con éxito!");
-                mostrarLogin();
+                document.getElementById('registerCard').style.display = 'none';
+                document.getElementById('loginCard').style.display = 'block';
             } catch (error) {
                 alert("Error al registrar: " + error.message);
             }
@@ -57,31 +58,93 @@
 
         window.entrarComoInvitado = function() {
             document.getElementById('loginCard').style.display = "none";
-            document.getElementById('appContainer').style.display = "block";
+            document.getElementById('registerCard').style.display = "none";
+            document.getElementById('setupMenu').style.display = "block";
             document.getElementById('lblUsuarioActivo').textContent = "Invitado (Sin Historial)";
             document.getElementById('historySection').style.display = "none";
             document.getElementById('btnHistorial').style.display = "none";
+            document.getElementById('txtCalibDate').value = ""; 
         };
 
         // Escuchar cambios de estado de autenticación
-        onAuthStateChanged(auth, (user) => {
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
                 document.getElementById('loginCard').style.display = "none";
                 document.getElementById('registerCard').style.display = "none";
-                document.getElementById('appContainer').style.display = "block";
+                document.getElementById('appContainer').style.display = "none";
+                document.getElementById('setupMenu').style.display = "block";
                 document.getElementById('lblUsuarioActivo').textContent = user.email;
                 document.getElementById('historySection').style.display = "block";
                 document.getElementById('btnHistorial').style.display = "inline-block";
+                
+                await cargarPerfilUsuario(user.email);
                 cargarHistorialCloud(user.email);
             } else {
+                document.getElementById('setupMenu').style.display = "none";
                 document.getElementById('appContainer').style.display = "none";
                 document.getElementById('loginCard').style.display = "block";
             }
         });
 
+        window.guardarFechaCalibracion = async function() {
+            const user = auth.currentUser;
+            if (!user) return;
+            const fechaVal = document.getElementById('txtCalibDate').value;
+            try {
+                await setDoc(doc(db, "usuarios_config", user.email), {
+                    calibracion: fechaVal
+                }, { merge: true });
+            } catch (e) {
+                console.error("Error al guardar calibración: ", e);
+            }
+        };
+
+        async function cargarPerfilUsuario(email) {
+            try {
+                const docRef = doc(db, "usuarios_config", email);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists() && docSnap.data().calibracion) {
+                    document.getElementById('txtCalibDate').value = docSnap.data().calibracion;
+                } else {
+                    document.getElementById('txtCalibDate').value = "";
+                }
+            } catch (e) {
+                console.error("Error al cargar perfil:", e);
+            }
+        }
+
+        // Transición del Menú Inicial a la Pantalla de Medición
+        window.irAPantallaMedicion = function() {
+            const equipo = document.getElementById('eqNombre').value.trim();
+            const marca = document.getElementById('eqMarca').value.trim();
+            const modelo = document.getElementById('eqModelo').value.trim();
+            const control = document.getElementById('eqControl').value.trim();
+            const serie = document.getElementById('eqSerie').value.trim();
+
+            if (!equipo || !marca || !modelo || !control || !serie) {
+                alert("Por favor completa todos los datos del equipo médico antes de continuar.");
+                return;
+            }
+
+            // Ocultar menú y mostrar app principal
+            document.getElementById('setupMenu').style.display = "none";
+            document.getElementById('appContainer').style.display = "block";
+
+            // Inyectar resumen de datos del equipo en la barra superior o terminal si se requiere
+            document.getElementById('lblInfoEquipo').textContent = `${equipo} | Marca: ${marca} | Modelo: ${modelo} | Control: ${control} | Serie: ${serie}`;
+        };
+
+        window.volverAlMenuEquipo = function() {
+            document.getElementById('appContainer').style.display = "none";
+            document.getElementById('setupMenu').style.display = "block";
+        };
+
         window.guardarPruebaActual = async function() {
             const contenido = document.getElementById('terminal').textContent.trim();
             const user = auth.currentUser;
+            const fechaCal = document.getElementById('txtCalibDate').value;
+            const infoEquipo = document.getElementById('lblInfoEquipo').textContent;
+
             if (!user || contenido.includes("Esperando conexión")) {
                 alert("No hay datos válidos para guardar.");
                 return;
@@ -90,6 +153,8 @@
                 await addDoc(collection(db, "pruebas_fluke"), {
                     usuario: user.email,
                     fecha: new Date().toLocaleString(),
+                    datosEquipo: infoEquipo,
+                    calibracionPatron: fechaCal,
                     datos: contenido,
                     timestamp: Date.now()
                 });
@@ -118,7 +183,7 @@
                     const docId = docSnapshot.id;
                     html += `
                         <div class="history-item">
-                            <span>🕒 <strong>${p.fecha}</strong></span>
+                            <span>🕒 <strong>${p.fecha}</strong><br><small>${p.datosEquipo || ''}</small></span>
                             <div>
                                 <button onclick="window.cargarPruebaEnTerminal('${btoa(p.datos)}')" style="background-color: #007bff; padding: 5px 10px; font-size: 12px; color:white; border:none; border-radius:4px; cursor:pointer;">Cargar</button>
                                 <button onclick="window.eliminarPruebaCloud('${docId}', '${email}')" style="background-color: #dc3545; padding: 5px 10px; font-size: 12px; color:white; border:none; border-radius:4px; cursor:pointer;">Eliminar</button>
@@ -161,27 +226,53 @@
             align-items: center;
             min-height: 100vh;
         }
-        .auth-card {
+        .auth-card, .setup-card {
             background: #fff;
             padding: 35px;
             border-radius: 10px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             width: 100%;
-            max-width: 400px;
+            max-width: 480px;
             box-sizing: border-box;
         }
-        .auth-card h2 { color: #003366; margin-top: 0; margin-bottom: 8px; text-align: center; }
-        .auth-card p { color: #666; font-size: 14px; margin-bottom: 25px; text-align: center; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #444; }
-        .form-control { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+        .auth-card h2, .setup-card h2 { color: #003366; margin-top: 0; margin-bottom: 8px; text-align: center; }
+        .auth-card p, .setup-card p { color: #666; font-size: 14px; margin-bottom: 20px; text-align: center; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 4px; color: #444; }
+        .form-control { width: 100%; padding: 9px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
         .btn-auth { width: 100%; padding: 11px; background-color: #007bff; color: white; border: none; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .btn-auth:hover { background-color: #0056b3; }
         .btn-guest-login { width: 100%; padding: 11px; background-color: #6c757d; color: white; border: none; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .btn-guest-login:hover { background-color: #5a6268; }
-        .auth-switch { text-align: center; margin-top: 20px; font-size: 13px; color: #666; }
+        .auth-switch { text-align: center; margin-top: 15px; font-size: 13px; color: #666; }
         .auth-switch a { color: #007bff; text-decoration: none; font-weight: bold; cursor: pointer; }
-        .auth-switch a:hover { text-decoration: underline; }
+
+        /* Tarjeta central Medir con icono de palas */
+        .measure-banner {
+            background: linear-gradient(135deg, #003366, #0056b3);
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            cursor: pointer;
+            margin-top: 20px;
+            box-shadow: 0 4px 10px rgba(0,51,102,0.3);
+            transition: transform 0.2s, background 0.2s;
+        }
+        .measure-banner:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(135deg, #002244, #004080);
+        }
+        .measure-icon {
+            font-size: 45px;
+            margin-bottom: 5px;
+        }
+        .measure-text {
+            color: #ffffff;
+            font-size: 22px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
 
         #appContainer {
             display: none;
@@ -193,8 +284,9 @@
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
             margin: 20px auto;
         }
-        .top-bar { display: flex; justify-content: space-between; align-items: center; background: #e9ecef; padding: 10px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 14px; }
-        h1 { color: #003366; font-size: 22px; margin-top: 0; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; background: #e9ecef; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; font-size: 13px; }
+        .equipment-summary { background: #e2f0d9; border: 1px solid #c8e6c9; padding: 10px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 15px; color: #2e7d32; font-weight: bold; }
+        h1 { color: #003366; font-size: 20px; margin-top: 0; }
         .status { font-weight: bold; margin-bottom: 15px; }
         .status.disconnected { color: #d9534f; }
         .status.connected { color: #5cb85c; }
@@ -207,7 +299,7 @@
         #btnLimpiar { background-color: #6c757d; }
         #btnPdf { background-color: #28a745; }
         #btnHistorial { background-color: #ffc107; color: #333; }
-        #terminal { width: 100%; height: 280px; background-color: #1e1e1e; color: #00ff00; font-family: 'Courier New', Courier, monospace; font-size: 13px; padding: 15px; box-sizing: border-box; border-radius: 4px; white-space: pre-wrap; overflow-y: auto; word-break: break-all; margin-bottom: 15px; }
+        #terminal { width: 100%; height: 260px; background-color: #1e1e1e; color: #00ff00; font-family: 'Courier New', Courier, monospace; font-size: 13px; padding: 15px; box-sizing: border-box; border-radius: 4px; white-space: pre-wrap; overflow-y: auto; word-break: break-all; margin-bottom: 15px; }
         #historySection { margin-top: 20px; border-top: 2px solid #ddd; padding-top: 15px; }
         .history-item { background: #f8f9fa; padding: 10px; border-radius: 4px; margin-bottom: 8px; border-left: 4px solid #007bff; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
     </style>
@@ -247,19 +339,61 @@
         <div class="auth-switch">¿Ya tienes cuenta? <a onclick="document.getElementById('registerCard').style.display='none'; document.getElementById('loginCard').style.display='block';">Inicia sesión</a></div>
     </div>
 
-    <!-- APP PRINCIPAL -->
+    <!-- MENÚ PREVIO: DATOS DEL EQUIPO MÉDICO -->
+    <div id="setupMenu" class="setup-card" style="display: none;">
+        <h2>Identificación del Equipo</h2>
+        <p>Ingresa los datos del dispositivo bajo prueba</p>
+        
+        <div class="form-group">
+            <label>Nombre del Equipo</label>
+            <input type="text" id="eqNombre" class="form-control" placeholder="Ej. Desfibrilador Bifásico" />
+        </div>
+        <div class="form-group">
+            <label>Marca</label>
+            <input type="text" id="eqMarca" class="form-control" placeholder="Ej. Philips / Zoll / Mindray" />
+        </div>
+        <div class="form-group">
+            <label>Modelo</label>
+            <input type="text" id="eqModelo" class="form-control" placeholder="Ej. BeneHeart D6" />
+        </div>
+        <div class="form-group">
+            <label>Número de Control</label>
+            <input type="text" id="eqControl" class="form-control" placeholder="Ej. NC-10492" />
+        </div>
+        <div class="form-group">
+            <label>Número de Serie</label>
+            <input type="text" id="eqSerie" class="form-control" placeholder="Ej. SN-8839201" />
+        </div>
+
+        <!-- Botón Central con Palas / Desfibrilador -->
+        <div class="measure-banner" onclick="window.irAPantallaMedicion()">
+            <div class="measure-icon">⚡</div>
+            <div class="measure-text">Medir</div>
+        </div>
+
+        <div style="text-align: right; margin-top: 15px;">
+            <button onclick="window.cerrarSesion()" style="background-color: #dc3545; padding: 6px 12px; font-size: 12px;">Cerrar Sesión</button>
+        </div>
+    </div>
+
+    <!-- APP PRINCIPAL DE MEDICIÓN -->
     <div id="appContainer">
         <div class="top-bar">
             <div>👤 Cuenta Cloud: <strong id="lblUsuarioActivo"></strong></div>
-            <button onclick="window.cerrarSesion()" style="background-color: #dc3545; padding: 5px 10px; font-size: 12px;">Cerrar Sesión</button>
+            <div>
+                <button onclick="window.volverAlMenuEquipo()" style="background-color: #17a2b8; padding: 5px 10px; font-size: 12px; margin-right: 5px;">Editar Datos Equipo</button>
+                <button onclick="window.cerrarSesion()" style="background-color: #dc3545; padding: 5px 10px; font-size: 12px;">Cerrar Sesión</button>
+            </div>
         </div>
+
+        <div id="lblInfoEquipo" class="equipment-summary"></div>
 
         <h1>Capturador Fluke Impulse 7000DP</h1>
         <div class="status">Estado: <span id="lblEstado" class="status disconnected">Desconectado</span></div>
 
         <div class="calibration-box">
             <label for="txtCalibDate">📅 Fecha de Calibración del Fluke:</label>
-            <input type="date" id="txtCalibDate">
+            <input type="date" id="txtCalibDate" onchange="window.guardarFechaCalibracion()">
         </div>
 
         <div class="buttons">
@@ -338,6 +472,7 @@
             const contenido = document.getElementById('terminal').textContent;
             const fechaCal = document.getElementById('txtCalibDate').value || "No especificada";
             const usuarioActivo = document.getElementById('lblUsuarioActivo').textContent;
+            const infoEquipo = document.getElementById('lblInfoEquipo').textContent;
 
             const ventanaImpresion = window.open('', '', 'width=900,height=700');
             ventanaImpresion.document.write(`
@@ -345,7 +480,8 @@
                     <head><title>Reporte Fluke</title></head>
                     <body style="font-family:monospace; padding:20px; font-size:12px;">
                         <strong>REPORTE FLUKE IMPULSE 7000DP</strong><br>
-                        Usuario: ${usuarioActivo}<br><hr>
+                        Usuario: ${usuarioActivo}<br>
+                        Datos del Equipo: ${infoEquipo}<br><hr>
                         <pre>${contenido}</pre><hr>
                         Fecha Calibración Patrón: ${fechaCal}
                         <script>window.onload = function() { window.print(); }<\/script>
