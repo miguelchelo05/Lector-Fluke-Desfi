@@ -30,10 +30,44 @@
         window.registrarUsuario = async function() {
             const email = document.getElementById('regId').value.trim();
             const pass = document.getElementById('regPass').value.trim();
-            if (!email || !pass) { alert("Completa todos los campos"); return; }
+            const passConfirm = document.getElementById('regPassConfirm').value.trim();
+            let tipoFlukeVal = document.getElementById('regTipoFluke').value;
+            const fechaCal = document.getElementById('regCalibDate').value;
+
+            if (!email || !pass || !passConfirm || !fechaCal) { 
+                alert("Por favor completa todos los campos obligatorios."); 
+                return; 
+            }
+            if (pass !== passConfirm) {
+                alert("Las contraseñas no coinciden. Por favor verifícalas.");
+                return;
+            }
+
+            if (tipoFlukeVal === "OTRO") {
+                const nombrePatron = document.getElementById('regOtroNombre').value.trim();
+                const marcaPatron = document.getElementById('regOtroMarca').value.trim();
+                const modeloPatron = document.getElementById('regOtroModelo').value.trim();
+                const seriePatron = document.getElementById('regOtroSerie').value.trim();
+                if (!nombrePatron || !marcaPatron) {
+                    alert("Al seleccionar 'Otro', al menos el Nombre y la Marca del patrón son obligatorios.");
+                    return;
+                }
+                tipoFlukeVal = `${nombrePatron} - Marca: ${marcaPatron} (Mod: ${modeloPatron || 'N/A'}, SN: ${seriePatron || 'N/A'})`;
+            }
+
             try {
-                await createUserWithEmailAndPassword(auth, email, pass);
-                alert("¡Cuenta creada con éxito!");
+                const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+                const user = userCredential.user;
+
+                // Guardar la configuración inicial del medidor en Firestore con el correo como ID
+                await setDoc(doc(db, "usuarios_config", email), {
+                    nombreUsuario: email.split('@')[0],
+                    calibracion: fechaCal,
+                    tipoFluke: tipoFlukeVal,
+                    logoUrl: ""
+                });
+
+                alert("¡Cuenta registrada y configurada con éxito!");
                 document.getElementById('registerCard').style.display = 'none';
                 document.getElementById('loginCard').style.display = 'block';
             } catch (error) {
@@ -127,6 +161,16 @@
             } else {
                 container.style.display = "none";
                 document.getElementById('lblTipoFlukeSpan').textContent = selectVal;
+            }
+        };
+
+        window.verificarTipoFlukeReg = function() {
+            const selectVal = document.getElementById('regTipoFluke').value;
+            const container = document.getElementById('regOtroPatronContainer');
+            if (selectVal === "OTRO") {
+                container.style.display = "block";
+            } else {
+                container.style.display = "none";
             }
         };
 
@@ -328,7 +372,6 @@
 
             const infoStr = `${equipo} | Marca: ${marca} | Modelo: ${modelo} | Control: ${control} | Serie/Ref: ${serie}`;
             
-            // Reiniciar o inicializar contador de pruebas para este equipo nuevo
             let contadorKey = `pruebaCount_${serie}`;
             if (!localStorage.getItem(contadorKey)) {
                 localStorage.setItem(contadorKey, '0');
@@ -360,7 +403,6 @@
                 return;
             }
 
-            // Incrementar contador de prueba
             const serieActiva = localStorage.getItem('serieActiva') || 'general';
             let contadorKey = `pruebaCount_${serieActiva}`;
             let numPrueba = parseInt(localStorage.getItem(contadorKey) || '0') + 1;
@@ -524,13 +566,14 @@
 
         .auth-card, .setup-card, .content-card {
             background: #fff;
-            padding: 35px;
+            padding: 30px;
             border-radius: 10px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             width: 100%;
             max-width: 500px;
             box-sizing: border-box;
-            margin-top: 40px;
+            margin-top: 20px;
+            margin-bottom: 20px;
         }
         .auth-card h2, .setup-card h2, .content-card h2 { color: #003366; margin-top: 0; margin-bottom: 8px; text-align: center; }
         .auth-card p, .setup-card p, .content-card p { color: #666; font-size: 14px; margin-bottom: 20px; text-align: center; }
@@ -627,16 +670,58 @@
     <!-- REGISTRO -->
     <div id="registerCard" class="auth-card" style="display: none;">
         <h2>Registro en la Nube</h2>
-        <p>Crea tu cuenta institucional</p>
+        <p>Crea tu cuenta institucional y configura tu equipo medidor</p>
+        
         <div class="form-group">
-            <label>Correo Electrónico</label>
+            <label>Correo Electrónico *</label>
             <input type="email" id="regId" class="form-control" placeholder="ejemplo@correo.com" />
         </div>
         <div class="form-group">
-            <label>Contraseña</label>
+            <label>Contraseña *</label>
             <input type="password" id="regPass" class="form-control" placeholder="••••••••" />
         </div>
-        <button class="btn-auth" onclick="window.registrarUsuario()" style="background-color: #28a745;">Registrarse</button>
+        <div class="form-group">
+            <label>Verificar Contraseña *</label>
+            <input type="password" id="regPassConfirm" class="form-control" placeholder="••••••••" />
+        </div>
+        <div class="form-group">
+            <label>⚡ Tipo de Analizador / Equipo Medidor *</label>
+            <select id="regTipoFluke" class="form-control" onchange="window.verificarTipoFlukeReg()">
+                <option value="Fluke Impulse 7000DP">Fluke Impulse 7000DP</option>
+                <option value="Fluke Impulse 6000D">Fluke Impulse 6000D</option>
+                <option value="Fluke ESA712">Fluke ESA712</option>
+                <option value="Fluke Biomedical ProSim 8">Fluke Biomedical ProSim 8</option>
+                <option value="OTRO">Otro (Personalizado)</option>
+            </select>
+        </div>
+
+        <!-- Campos adicionales si selecciona OTRO en registro -->
+        <div id="regOtroPatronContainer" style="display: none; background: #e9ecef; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
+            <label style="font-size:12px; font-weight:bold; color:#003366; margin-bottom:8px; display:block;">Especificar Patrón Personalizado:</label>
+            <div class="form-group">
+                <label>Nombre del Equipo / Patrón *</label>
+                <input type="text" id="regOtroNombre" class="form-control" placeholder="Ej. Simulador / Analizador X" />
+            </div>
+            <div class="form-group">
+                <label>Marca *</label>
+                <input type="text" id="regOtroMarca" class="form-control" placeholder="Ej. Marca del equipo" />
+            </div>
+            <div class="form-group">
+                <label>Modelo (Opcional)</label>
+                <input type="text" id="regOtroModelo" class="form-control" placeholder="Ej. Modelo X" />
+            </div>
+            <div class="form-group">
+                <label>Número de Serie (Opcional)</label>
+                <input type="text" id="regOtroSerie" class="form-control" placeholder="Ej. SN-0000" />
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>📅 Fecha de Calibración del Patrón *</label>
+            <input type="date" id="regCalibDate" class="form-control" />
+        </div>
+
+        <button class="btn-auth" onclick="window.registrarUsuario()" style="background-color: #28a745;">Completar Registro</button>
         <div class="auth-switch">¿Ya tienes cuenta? <a onclick="document.getElementById('registerCard').style.display='none'; document.getElementById('loginCard').style.display='block';">Inicia sesión</a></div>
     </div>
 
@@ -727,7 +812,7 @@
 
     <!-- SECCIÓN: VALIDACIÓN DE PRUEBAS DE SEGURIDAD -->
     <div id="seguridadView">
-        <h2>Validación de Pruebas de Seguridad</h2>
+        <h2>Validación Pruebas de Seguridad</h2>
         <p>Criterios de aceptación para liberación de equipos</p>
         <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; font-size: 14px; line-height: 1.6;">
             <p><strong>Parámetros críticos evaluados por el analizador:</strong></p>
@@ -754,7 +839,6 @@
                 <input type="email" id="cfgCorreo" class="form-control" placeholder="correo@hospital.com" />
             </div>
 
-            <!-- Botón seguro para actualizar contraseña mediante enlace de correo -->
             <div class="form-group" id="btnCambiarPass" style="margin-top: 15px; margin-bottom: 20px;">
                 <label>Seguridad de la Cuenta</label>
                 <button type="button" onclick="window.enviarCorreoCambioPassword()" style="background-color: #ffc107; color: #333; padding: 9px 12px; width: 100%; border-radius: 6px; font-size: 14px; font-weight: bold; border: none; cursor: pointer;">🔐 Enviar enlace para cambiar contraseña por Correo</button>
@@ -771,7 +855,6 @@
                 </select>
             </div>
 
-            <!-- Campos adicionales si selecciona OTRO -->
             <div id="otroPatronContainer" style="display: none; background: #e9ecef; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
                 <label style="font-size:12px; font-weight:bold; color:#003366; margin-bottom:8px; display:block;">Especificar Patrón Personalizado:</label>
                 <div class="form-group">
@@ -892,7 +975,6 @@
                 if (partes.length > 1) marcaTexto = partes[1].replace("Marca:", "").trim();
             }
 
-            // Generar o avanzar título de prueba al imprimir/generar PDF
             const serieActiva = localStorage.getItem('serieActiva') || 'general';
             let contadorKey = `pruebaCount_${serieActiva}`;
             let numPrueba = parseInt(localStorage.getItem(contadorKey) || '0') + 1;
