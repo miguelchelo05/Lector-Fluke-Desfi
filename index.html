@@ -158,7 +158,9 @@
             const logoSrc = document.getElementById('cfgLogoPreview').src;
             const tieneLogoValido = logoSrc && logoSrc.startsWith('data:image') && document.getElementById('cfgLogoPreview').style.display !== 'none';
             const mostrarLogo = tieneLogoValido ? `<img src="${logoSrc}" style="max-height: 50px; max-width: 150px;">` : '';
-            const fechaActual = new Date().toLocaleDateString();
+            
+            // --- ACTUALIZACIÓN DE FECHA Y HORA ---
+            const fechaActualCompleta = new Date().toLocaleString(); 
 
             const ventanaImpresion = window.open('', '', 'width=900,height=700');
             ventanaImpresion.document.write(`
@@ -197,7 +199,7 @@
 
                         <div class="footer">
                             <div>Patrón: ${tipoFluke} | Calibración Patrón: ${fechaCal}</div>
-                            <div>Fecha Emisión: ${fechaActual}</div>
+                            <div>Fecha Emisión: ${fechaActualCompleta}</div>
                         </div>
 
                         <script>
@@ -721,7 +723,9 @@
             }
 
             const tituloPrueba = p.titulo || "Reporte Guardado";
-            const fechaActual = p.fecha || "Fecha desconocida";
+            
+            // --- ACTUALIZACIÓN DE FECHA Y HORA ---
+            const fechaActualCompleta = p.fecha || new Date().toLocaleString();
 
             const logoSrc = document.getElementById('cfgLogoPreview').src;
             const tieneLogoValido = logoSrc && logoSrc.startsWith('data:image') && document.getElementById('cfgLogoPreview').style.display !== 'none';
@@ -761,7 +765,7 @@
                         <pre>${contenidoLimpio}</pre>
                         <div class="footer">
                             <div>Patrón: ${tipoFluke} | Calibración Patrón: ${fechaCal}</div>
-                            <div>Fecha original: ${fechaActual}</div>
+                            <div>Fecha Emisión: ${fechaActualCompleta}</div>
                         </div>
                         <script>
                             window.onload = function() { window.print(); }
