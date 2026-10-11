@@ -32,6 +32,11 @@
         let temporizadorInactividad; 
         let nuevaPruebaLista = true; 
 
+        // --- VARIABLES GLOBALES PARA EL HISTORIAL AVANZADO ---
+        window.pruebasGuardadasTemp = {}; // Guardar objetos completos
+        window.historialArray = []; // Array para poder ordenar y filtrar
+        window.ordenActual = { columna: 'fechaRaw', ascendente: false }; // Por defecto: más recientes primero
+
         // --- FUNCIONES DE PUERTO SERIAL Y BOTONES (Asignadas a window para evitar bloqueos) ---
         window.conectarPuerto = async function() {
             if (!("serial" in navigator)) {
@@ -159,7 +164,6 @@
             const tieneLogoValido = logoSrc && logoSrc.startsWith('data:image') && document.getElementById('cfgLogoPreview').style.display !== 'none';
             const mostrarLogo = tieneLogoValido ? `<img src="${logoSrc}" style="max-height: 50px; max-width: 150px;">` : '';
             
-            // --- ACTUALIZACIÓN DE FECHA Y HORA ---
             const fechaActualCompleta = new Date().toLocaleString(); 
 
             const ventanaImpresion = window.open('', '', 'width=900,height=700');
@@ -629,42 +633,166 @@
             }
         };
 
+        // --- FUNCIONES AVANZADAS DE HISTORIAL (ORDENAMIENTO Y FILTROS) ---
         async function cargarHistorialCloud(email) {
-            const listaHistorialPrincipal = document.getElementById('listaHistorialPrincipal');
-            if(listaHistorialPrincipal) listaHistorialPrincipal.innerHTML = "Cargando historial desde la nube...";
+            const tbody = document.getElementById('tablaHistorialBody');
+            if(tbody) tbody.innerHTML = "<tr><td colspan='7' style='text-align:center;'>Cargando historial desde la nube...</td></tr>";
+            
             window.pruebasGuardadasTemp = {}; 
+            window.historialArray = [];
             
             try {
                 const q = query(collection(db, "pruebas_fluke"), where("usuario", "==", email));
                 const querySnapshot = await getDocs(q);
                 
                 if (querySnapshot.empty) {
-                    if(listaHistorialPrincipal) listaHistorialPrincipal.innerHTML = "No hay pruebas guardadas en la nube.";
+                    if(tbody) tbody.innerHTML = "<tr><td colspan='7' style='text-align:center;'>No hay pruebas guardadas en la nube.</td></tr>";
                     return;
                 }
 
-                let html = "";
                 querySnapshot.forEach((docSnapshot) => {
                     const p = docSnapshot.data();
                     const docId = docSnapshot.id;
-                    const tituloDisplay = p.titulo || "Reporte Guardado";
                     window.pruebasGuardadasTemp[docId] = p; 
 
-                    html += `
-                        <div class="history-item">
-                            <span>🕒 <strong>${tituloDisplay}</strong> - ${p.fecha}<br><small>${p.datosEquipo || ''}</small></span>
-                            <div style="display: flex; gap: 5px;">
-                                <button onclick="window.verPdfDirecto('${docId}')" style="background-color: #28a745; padding: 5px 10px; font-size: 12px; color:white; border:none; border-radius:4px; cursor:pointer;">Ver PDF</button>
-                                <button onclick="window.cargarPruebaEnTerminal('${btoa(p.datos)}')" style="background-color: #007bff; padding: 5px 10px; font-size: 12px; color:white; border:none; border-radius:4px; cursor:pointer;">Cargar</button>
-                                <button onclick="window.eliminarPruebaCloud('${docId}', '${email}')" style="background-color: #dc3545; padding: 5px 10px; font-size: 12px; color:white; border:none; border-radius:4px; cursor:pointer;">Eliminar</button>
-                            </div>
-                        </div>
-                    `;
+                    // Desarmar la cadena de información del equipo
+                    const infoEquipoCompleta = p.datosEquipo || "";
+                    let eq = "N/A", mar = "N/A", mod = "N/A", ctrl = "N/A", ser = "N/A";
+                    if (infoEquipoCompleta) {
+                        const partes = infoEquipoCompleta.split('|');
+                        if (partes.length > 0) eq = partes[0].trim();
+                        if (partes.length > 1) mar = partes[1].replace("Marca:", "").trim();
+                        if (partes.length > 2) mod = partes[2].replace("Modelo:", "").trim();
+                        if (partes.length > 3) ctrl = partes[3].replace("Control:", "").trim();
+                        if (partes.length > 4) ser = partes[4].replace("Serie/Ref:", "").trim();
+                    }
+                    if (!ctrl || ctrl.trim() === "") ctrl = "N/A";
+
+                    window.historialArray.push({
+                        id: docId,
+                        titulo: p.titulo || "Reporte Guardado",
+                        fecha: p.fecha || "",
+                        fechaRaw: p.timestamp || 0, // Usar el timestamp numérico para ordenar bien las fechas
+                        equipo: eq,
+                        marca: mar,
+                        modelo: mod,
+                        control: ctrl,
+                        serie: ser
+                    });
                 });
-                if(listaHistorialPrincipal) listaHistorialPrincipal.innerHTML = html;
+                
+                // Ordenar inicialmente por fecha más reciente
+                window.ordenarTabla('fechaRaw', false);
+
             } catch (e) {
-                if(listaHistorialPrincipal) listaHistorialPrincipal.innerHTML = "Error al cargar historial.";
+                if(tbody) tbody.innerHTML = `<tr><td colspan='7' style='text-align:center; color:red;'>Error al cargar historial: ${e.message}</td></tr>`;
             }
+        }
+
+        window.ordenarTabla = function(columna, noCambiarDireccion = false) {
+            // Alternar dirección si se hizo clic en la misma columna
+            if (!noCambiarDireccion) {
+                if (window.ordenActual.columna === columna) {
+                    window.ordenActual.ascendente = !window.ordenActual.ascendente;
+                } else {
+                    window.ordenActual.columna = columna;
+                    window.ordenActual.ascendente = true; // A-Z por defecto al cambiar columna
+                }
+            }
+
+            const asc = window.ordenActual.ascendente;
+
+            window.historialArray.sort((a, b) => {
+                let valA = a[columna];
+                let valB = b[columna];
+
+                // Lógica especial para Número de Control (Los "N/A" se van al final y se ordenan por serie)
+                if (columna === 'control') {
+                    const isNaA = (valA === "N/A" || valA === "");
+                    const isNaB = (valB === "N/A" || valB === "");
+
+                    if (isNaA && !isNaB) return 1; // A es N/A, va después
+                    if (!isNaA && isNaB) return -1; // B es N/A, A va antes
+                    
+                    // Si ambos son N/A, desempatar ordenando por número de serie
+                    if (isNaA && isNaB) {
+                        valA = a.serie.toLowerCase();
+                        valB = b.serie.toLowerCase();
+                    } else {
+                        // Si ninguno es N/A, comparar sus controles normales
+                        valA = valA.toLowerCase();
+                        valB = valB.toLowerCase();
+                    }
+                } else if (columna !== 'fechaRaw') {
+                    // Ordenamiento alfabético estándar para las demás columnas de texto
+                    valA = String(valA).toLowerCase();
+                    valB = String(valB).toLowerCase();
+                }
+
+                if (valA < valB) return asc ? -1 : 1;
+                if (valA > valB) return asc ? 1 : -1;
+                return 0;
+            });
+
+            // Actualizar visualización de las flechas en los encabezados
+            const headers = ['titulo', 'fechaRaw', 'equipo', 'marca', 'modelo', 'serie', 'control'];
+            headers.forEach(h => {
+                const el = document.getElementById(`sort_${h}`);
+                if (el) {
+                    el.innerHTML = (h === window.ordenActual.columna) ? (asc ? ' ▲' : ' ▼') : ' ↕';
+                    el.style.color = (h === window.ordenActual.columna) ? '#007bff' : '#ccc';
+                }
+            });
+
+            renderizarTablaHistorial();
+        };
+
+        window.filtrarHistorial = function() {
+            renderizarTablaHistorial();
+        };
+
+        function renderizarTablaHistorial() {
+            const tbody = document.getElementById('tablaHistorialBody');
+            const terminoBusqueda = document.getElementById('searchHistorial').value.toLowerCase();
+            
+            if (!tbody) return;
+            tbody.innerHTML = "";
+
+            const resultadosFiltrados = window.historialArray.filter(item => {
+                return item.titulo.toLowerCase().includes(terminoBusqueda) ||
+                       item.equipo.toLowerCase().includes(terminoBusqueda) ||
+                       item.marca.toLowerCase().includes(terminoBusqueda) ||
+                       item.modelo.toLowerCase().includes(terminoBusqueda) ||
+                       item.serie.toLowerCase().includes(terminoBusqueda) ||
+                       item.control.toLowerCase().includes(terminoBusqueda) ||
+                       item.fecha.toLowerCase().includes(terminoBusqueda);
+            });
+
+            if (resultadosFiltrados.length === 0) {
+                tbody.innerHTML = "<tr><td colspan='7' style='text-align:center; padding: 20px;'>No se encontraron resultados para tu búsqueda.</td></tr>";
+                return;
+            }
+
+            resultadosFiltrados.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="font-weight:bold; color:#003366;">${item.titulo}</td>
+                    <td>${item.fecha}</td>
+                    <td>${item.equipo}</td>
+                    <td>${item.marca}</td>
+                    <td><small>${item.modelo}</small></td>
+                    <td><small>${item.serie}</small></td>
+                    <td><span style="background:${item.control === 'N/A' ? '#e9ecef' : '#e2f0d9'}; color:${item.control === 'N/A' ? '#6c757d' : '#2e7d32'}; padding: 3px 6px; border-radius: 4px; font-size:11px;">${item.control}</span></td>
+                    <td style="text-align: center;">
+                        <div style="display: flex; gap: 5px; justify-content: center;">
+                            <button onclick="window.verPdfDirecto('${item.id}')" style="background-color: #28a745; padding: 5px 8px; font-size: 11px; color:white; border:none; border-radius:4px; cursor:pointer;" title="Imprimir / Ver PDF">📄 PDF</button>
+                            <button onclick="window.cargarPruebaEnTerminal('${btoa(window.pruebasGuardadasTemp[item.id].datos)}')" style="background-color: #007bff; padding: 5px 8px; font-size: 11px; color:white; border:none; border-radius:4px; cursor:pointer;" title="Cargar en la Terminal Principal">⚡ Cargar</button>
+                            <button onclick="window.eliminarPruebaCloud('${item.id}', '${auth.currentUser.email}')" style="background-color: #dc3545; padding: 5px 8px; font-size: 11px; color:white; border:none; border-radius:4px; cursor:pointer;" title="Eliminar Reporte">🗑️</button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
         }
 
         window.cargarPruebaEnTerminal = function(datosBase64) {
@@ -723,8 +851,6 @@
             }
 
             const tituloPrueba = p.titulo || "Reporte Guardado";
-            
-            // --- ACTUALIZACIÓN DE FECHA Y HORA ---
             const fechaActualCompleta = p.fecha || new Date().toLocaleString();
 
             const logoSrc = document.getElementById('cfgLogoPreview').src;
@@ -765,7 +891,7 @@
                         <pre>${contenidoLimpio}</pre>
                         <div class="footer">
                             <div>Patrón: ${tipoFluke} | Calibración Patrón: ${fechaCal}</div>
-                            <div>Fecha Emisión: ${fechaActualCompleta}</div>
+                            <div>Fecha original: ${fechaActualCompleta}</div>
                         </div>
                         <script>
                             window.onload = function() { window.print(); }
@@ -777,7 +903,7 @@
         };
 
         window.eliminarPruebaCloud = async function(docId, email) {
-            if (confirm("¿Estás seguro de eliminar este registro de la nube?")) {
+            if (confirm("¿Estás seguro de eliminar este registro de la nube permanentemente?")) {
                 try {
                     await deleteDoc(doc(db, "pruebas_fluke", docId));
                     cargarHistorialCloud(email);
@@ -815,7 +941,13 @@
         .measure-banner:hover { transform: translateY(-2px); }
         .measure-icon { font-size: 45px; margin-bottom: 5px; }
         .measure-text { color: #ffffff; font-size: 22px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
-        #appContainer, #savedHistoryView, #normasView, #seguridadView, #configView { display: none; max-width: 850px; width: 95%; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin: 40px auto; }
+        
+        /* Contenedores Principales */
+        #appContainer, #normasView, #seguridadView, #configView { display: none; max-width: 850px; width: 95%; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin: 40px auto; }
+        
+        /* Contenedor Expandido para Historial */
+        #savedHistoryView { display: none; max-width: 1100px; width: 95%; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin: 40px auto; }
+        
         .top-bar { display: flex; justify-content: space-between; align-items: center; background: #e9ecef; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; font-size: 13px; }
         .equipment-summary { background: #e2f0d9; border: 1px solid #c8e6c9; padding: 10px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 15px; color: #2e7d32; font-weight: bold; }
         h1 { color: #003366; font-size: 20px; margin-top: 0; }
@@ -832,8 +964,17 @@
         #btnPdf { background-color: #28a745; }
         #btnHistorial { background-color: #ffc107; color: #333; }
         #terminal { width: 100%; height: 260px; background-color: #1e1e1e; color: #00ff00; font-family: 'Courier New', Courier, monospace; font-size: 13px; padding: 15px; box-sizing: border-box; border-radius: 4px; white-space: pre-wrap; overflow-y: auto; word-break: break-all; margin-bottom: 15px; }
-        .history-item { background: #f8f9fa; padding: 10px; border-radius: 4px; margin-bottom: 8px; border-left: 4px solid #007bff; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
         .logo-preview { max-width: 120px; max-height: 60px; display: none; margin-top: 5px; border: 1px solid #ddd; padding: 2px; }
+
+        /* Estilos de Tabla de Historial */
+        .search-bar { width: 100%; padding: 10px 15px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+        .table-responsive { width: 100%; overflow-x: auto; }
+        .table-cloud { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 800px; }
+        .table-cloud th { background-color: #003366; color: white; padding: 10px; text-align: left; cursor: pointer; user-select: none; position: sticky; top: 0; white-space: nowrap; }
+        .table-cloud th:hover { background-color: #004080; }
+        .table-cloud td { padding: 10px; border-bottom: 1px solid #ddd; vertical-align: middle; }
+        .table-cloud tr:hover { background-color: #f1f7fd; }
+        .sort-icon { font-size: 10px; margin-left: 5px; color: #ccc; }
     </style>
 </head>
 <body>
@@ -847,7 +988,7 @@
         <div class="sidebar-header">Menú Principal</div>
         <ul class="sidebar-menu-list">
             <li><a onclick="window.irASeccion('home')">🏠 Home (Realizar Pruebas)</a></li>
-            <li><a onclick="window.irASeccion('historial')">📁 Pruebas Guardadas</a></li>
+            <li><a onclick="window.irASeccion('historial')">📁 Pruebas Guardadas (Base de Datos)</a></li>
             <li><a onclick="window.irASeccion('normas')">📖 Normativas</a></li>
             <li><a onclick="window.irASeccion('seguridad')">⚡ Validación Pruebas de Seguridad</a></li>
             <li><a onclick="window.irASeccion('config')">⚙️ Configuración</a></li>
@@ -962,10 +1103,34 @@
         <div id="terminal">Esperando conexión con el equipo...</div>
     </div>
 
-    <!-- SECCIÓN: PRUEBAS GUARDADAS -->
+    <!-- SECCIÓN: PRUEBAS GUARDADAS (NUEVO HISTORIAL AVANZADO) -->
     <div id="savedHistoryView">
-        <h2>Reportes Guardados en la Nube</h2>
-        <div id="listaHistorialPrincipal">Cargando...</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #003366; padding-bottom: 10px; margin-bottom: 20px;">
+            <h2 style="margin: 0; color: #003366;">Base de Datos de Reportes</h2>
+            <span style="font-size: 12px; color: #666;">Haz clic en los encabezados para ordenar</span>
+        </div>
+        
+        <input type="text" id="searchHistorial" class="search-bar" placeholder="🔍 Buscar por Folio, Equipo, Marca, Serie o Control..." onkeyup="window.filtrarHistorial()">
+        
+        <div class="table-responsive">
+            <table class="table-cloud">
+                <thead>
+                    <tr>
+                        <th onclick="window.ordenarTabla('titulo')">Folio / Reporte <span id="sort_titulo" class="sort-icon">↕</span></th>
+                        <th onclick="window.ordenarTabla('fechaRaw')">Fecha y Hora <span id="sort_fechaRaw" class="sort-icon" style="color:#007bff;">▼</span></th>
+                        <th onclick="window.ordenarTabla('equipo')">Equipo <span id="sort_equipo" class="sort-icon">↕</span></th>
+                        <th onclick="window.ordenarTabla('marca')">Marca <span id="sort_marca" class="sort-icon">↕</span></th>
+                        <th onclick="window.ordenarTabla('modelo')">Modelo <span id="sort_modelo" class="sort-icon">↕</span></th>
+                        <th onclick="window.ordenarTabla('serie')">Num. Serie <span id="sort_serie" class="sort-icon">↕</span></th>
+                        <th onclick="window.ordenarTabla('control')" title="Los equipos sin número de control (N/A) se enviarán al final de la lista">Control <span id="sort_control" class="sort-icon">↕</span></th>
+                        <th style="text-align: center; cursor: default;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaHistorialBody">
+                    <tr><td colspan='8' style='text-align:center;'>Cargando historial desde la nube...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- SECCIÓN: NORMATIVAS -->
