@@ -395,7 +395,6 @@
             const control = document.getElementById('eqControl').value.trim() || "N/A";
             const serie = document.getElementById('eqSerie').value.trim();
 
-            // Validación obligatoria que incluye el nombre del reporte
             if (!nombreReporte || !equipo || !marca || !modelo || !serie) {
                 alert("Por favor completa los campos obligatorios: Nombre / Folio del Reporte, Nombre de Equipo, Marca, Modelo y Número de Serie / Referencia.");
                 return;
@@ -403,7 +402,6 @@
 
             const infoStr = `${equipo} | Marca: ${marca} | Modelo: ${modelo} | Control: ${control} | Serie/Ref: ${serie}`;
 
-            // Guardamos el título personalizado en lugar de usar un contador
             localStorage.setItem('tituloReporteActivo', nombreReporte);
             localStorage.setItem('equipoActivo', infoStr);
             localStorage.setItem('serieActiva', serie);
@@ -411,7 +409,6 @@
 
             document.getElementById('setupMenu').style.display = "none";
             document.getElementById('appContainer').style.display = "block";
-            // Mostramos el nombre del reporte y los datos del equipo en el banner verde
             document.getElementById('lblInfoEquipo').innerHTML = `<strong>${nombreReporte}</strong><br><span style="font-weight:normal;">${infoStr}</span>`;
             
             if (typeof window.limpiarPantalla === "function") {
@@ -424,7 +421,6 @@
             document.getElementById('appContainer').style.display = "none";
             document.getElementById('setupMenu').style.display = "block";
             
-            // Opcional: Rellenar el campo del reporte con el valor previo al volver atrás
             const tituloReporteGuardado = localStorage.getItem('tituloReporteActivo') || "";
             if(tituloReporteGuardado) document.getElementById('eqNombreReporte').value = tituloReporteGuardado;
         };
@@ -433,7 +429,6 @@
             const contenido = document.getElementById('terminal').textContent.trim();
             const user = auth.currentUser;
             const fechaCal = document.getElementById('txtCalibDate').value;
-            // Obtenemos los datos puros del equipo (sin html)
             const infoEquipo = localStorage.getItem('equipoActivo') || "No especificado";
 
             if (!user || contenido.includes("Esperando conexión") || contenido === "") {
@@ -441,7 +436,6 @@
                 return;
             }
 
-            // Tomamos el título que el usuario escribió manualmente
             const tituloReporte = localStorage.getItem('tituloReporteActivo') || "Reporte sin título";
 
             try {
@@ -536,13 +530,24 @@
             const tipoFluke = p.tipoFluke || "No especificado";
             const nombreResponsable = document.getElementById('cfgNombreUsuario').value.trim() || p.usuario;
             
+            // Lógica de separación de datos completa para el PDF desde la Nube
+            const infoEquipoCompleta = p.datosEquipo || "";
             let equipoTexto = "No especificado";
             let marcaTexto = "No especificada";
-            if (p.datosEquipo) {
-                const partes = p.datosEquipo.split('|');
+            let modeloTexto = "No especificado";
+            let controlTexto = "N/A";
+            let serieTexto = "No especificada";
+
+            if (infoEquipoCompleta) {
+                const partes = infoEquipoCompleta.split('|');
                 if (partes.length > 0) equipoTexto = partes[0].trim();
                 if (partes.length > 1) marcaTexto = partes[1].replace("Marca:", "").trim();
+                if (partes.length > 2) modeloTexto = partes[2].replace("Modelo:", "").trim();
+                if (partes.length > 3) controlTexto = partes[3].replace("Control:", "").trim();
+                if (partes.length > 4) serieTexto = partes[4].replace("Serie/Ref:", "").trim();
             }
+
+            let htmlControl = (controlTexto !== "N/A" && controlTexto !== "") ? ` | <strong>Control:</strong> ${controlTexto}` : "";
 
             const tituloPrueba = p.titulo || "Reporte Guardado";
             const fechaActual = p.fecha || "Fecha desconocida";
@@ -580,7 +585,7 @@
                         </div>
                         <div class="meta-info">
                             <p><strong>Responsable:</strong> ${nombreResponsable}</p>
-                            <p><strong>Equipo:</strong> ${equipoTexto} | <strong>Marca:</strong> ${marcaTexto}</p>
+                            <p><strong>Equipo:</strong> ${equipoTexto} | <strong>Marca:</strong> ${marcaTexto} | <strong>Modelo:</strong> ${modeloTexto} | <strong>Serie:</strong> ${serieTexto}${htmlControl}</p>
                         </div>
                         <pre>${contenidoLimpio}</pre>
                         <div class="footer">
@@ -753,7 +758,6 @@
         <h2>Identificación del Equipo</h2>
         <p>Ingresa los datos del dispositivo bajo prueba</p>
         
-        <!-- NUEVO CAMPO OBLIGATORIO AÑADIDO AQUÍ -->
         <div class="form-group">
             <label>Nombre / Folio del Reporte *</label>
             <input type="text" id="eqNombreReporte" class="form-control" placeholder="Ej. Mantenimiento Preventivo Oct-2026" />
@@ -1023,17 +1027,25 @@
             const tipoFluke = document.getElementById('lblTipoFlukeSpan').textContent;
             const nombreResponsable = document.getElementById('cfgNombreUsuario').value.trim() || "Usuario";
             
-            const infoEquipoCompleta = localStorage.getItem('equipoActivo') || "No especificado";
+            // Separación completa de la cadena guardada para el PDF en tiempo real
+            const infoEquipoCompleta = localStorage.getItem('equipoActivo') || "";
             let equipoTexto = "No especificado";
             let marcaTexto = "No especificada";
+            let modeloTexto = "No especificado";
+            let controlTexto = "N/A";
+            let serieTexto = "No especificada";
             
             if (infoEquipoCompleta) {
                 const partes = infoEquipoCompleta.split('|');
                 if (partes.length > 0) equipoTexto = partes[0].trim();
                 if (partes.length > 1) marcaTexto = partes[1].replace("Marca:", "").trim();
+                if (partes.length > 2) modeloTexto = partes[2].replace("Modelo:", "").trim();
+                if (partes.length > 3) controlTexto = partes[3].replace("Control:", "").trim();
+                if (partes.length > 4) serieTexto = partes[4].replace("Serie/Ref:", "").trim();
             }
 
-            // Usamos el nombre que escribiste al inicio en lugar del contador
+            let controlHtml = (controlTexto && controlTexto !== "N/A") ? ` | <strong>Control:</strong> ${controlTexto}` : "";
+
             const tituloReporte = localStorage.getItem('tituloReporteActivo') || "Reporte Técnico";
 
             const logoSrc = document.getElementById('cfgLogoPreview').src;
@@ -1120,7 +1132,7 @@
 
                         <div class="meta-info">
                             <p><strong>Responsable:</strong> ${nombreResponsable}</p>
-                            <p><strong>Equipo:</strong> ${equipoTexto} | <strong>Marca:</strong> ${marcaTexto}</p>
+                            <p><strong>Equipo:</strong> ${equipoTexto} | <strong>Marca:</strong> ${marcaTexto} | <strong>Modelo:</strong> ${modeloTexto} | <strong>Serie:</strong> ${serieTexto}${controlHtml}</p>
                         </div>
 
                         <pre>${contenidoLimpio}</pre>
