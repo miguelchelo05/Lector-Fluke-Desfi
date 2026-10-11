@@ -11,7 +11,6 @@
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateEmail, sendPasswordResetEmail, sendEmailVerification, deleteUser } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc, setDoc, getDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // Configuración de Firebase provista
         const firebaseConfig = {
             apiKey: "AIzaSyAXH6FtCuAN7owKcYsoSe1fzqHNrpTmdr8",
             authDomain: "flux-desfri.firebaseapp.com",
@@ -102,8 +101,6 @@
             if (confirm("⚠️ ADVERTENCIA: Esta acción eliminará permanentemente tu cuenta, configuración y todas tus pruebas guardadas en la nube. Esta acción no se puede deshacer. ¿Deseas continuar?")) {
                 try {
                     const email = user.email;
-
-                    // 1. Eliminar documentos de pruebas en Firestore
                     const q = query(collection(db, "pruebas_fluke"), where("usuario", "==", email));
                     const querySnapshot = await getDocs(q);
                     const batch = writeBatch(db);
@@ -112,16 +109,13 @@
                     });
                     await batch.commit();
 
-                    // 2. Eliminar documento de configuración en Firestore
                     await deleteDoc(doc(db, "usuarios_config", email));
-
-                    // 3. Eliminar usuario de Firebase Authentication
                     await deleteUser(user);
 
                     localStorage.clear();
                     alert("Tu cuenta y todos sus datos han sido eliminados por completo.");
                 } catch (error) {
-                    alert("Error al eliminar la cuenta (es posible que debas volver a iniciar sesión por seguridad): " + error.message);
+                    alert("Error al eliminar la cuenta: " + error.message);
                 }
             }
         };
@@ -156,6 +150,7 @@
 
                 const seccionGuardada = localStorage.getItem('seccionActiva') || 'setupMenu';
                 const equipoGuardado = localStorage.getItem('equipoActivo');
+                const tituloReporteGuardado = localStorage.getItem('tituloReporteActivo') || "";
 
                 document.getElementById('setupMenu').style.display = "none";
                 document.getElementById('appContainer').style.display = "none";
@@ -166,7 +161,7 @@
 
                 if (seccionGuardada === 'appContainer' && equipoGuardado) {
                     document.getElementById('appContainer').style.display = "block";
-                    document.getElementById('lblInfoEquipo').textContent = equipoGuardado;
+                    document.getElementById('lblInfoEquipo').innerHTML = tituloReporteGuardado ? `<strong>${tituloReporteGuardado}</strong><br><span style="font-weight:normal;">${equipoGuardado}</span>` : equipoGuardado;
                 } else if (seccionGuardada && document.getElementById(seccionGuardada)) {
                     document.getElementById(seccionGuardada).style.display = "block";
                     if (seccionGuardada === 'savedHistoryView') {
@@ -218,7 +213,7 @@
             if (confirm(`¿Deseas enviar un enlace de verificación de cambio de contraseña a tu correo (${user.email})?`)) {
                 try {
                     await sendPasswordResetEmail(auth, user.email);
-                    alert("¡Correo enviado con éxito! Revisa tu bandeja de entrada para cambiar tu contraseña de forma segura.");
+                    alert("¡Correo enviado con éxito! Revisa tu bandeja de entrada.");
                 } catch (e) {
                     alert("Error al enviar el correo: " + e.message);
                 }
@@ -332,7 +327,6 @@
                     document.getElementById('lblTipoFlukeSpan').textContent = "Fluke Impulse 7000DP";
                 }
             } catch (e) {
-                console.error("Error al cargar perfil:", e);
                 document.getElementById('cfgNombreUsuario').value = email.split('@')[0];
             }
         }
@@ -365,10 +359,11 @@
             let targetId = '';
             if (seccionId === 'home') {
                 const equipoGuardado = localStorage.getItem('equipoActivo');
+                const tituloReporteGuardado = localStorage.getItem('tituloReporteActivo') || "";
                 if (equipoGuardado) {
                     targetId = 'appContainer';
                     document.getElementById('appContainer').style.display = 'block';
-                    document.getElementById('lblInfoEquipo').textContent = equipoGuardado;
+                    document.getElementById('lblInfoEquipo').innerHTML = tituloReporteGuardado ? `<strong>${tituloReporteGuardado}</strong><br><span style="font-weight:normal;">${equipoGuardado}</span>` : equipoGuardado;
                 } else {
                     targetId = 'setupMenu';
                     document.getElementById('setupMenu').style.display = 'block';
@@ -393,60 +388,66 @@
         };
 
         window.irAPantallaMedicion = function() {
+            const nombreReporte = document.getElementById('eqNombreReporte').value.trim();
             const equipo = document.getElementById('eqNombre').value.trim();
             const marca = document.getElementById('eqMarca').value.trim();
             const modelo = document.getElementById('eqModelo').value.trim();
             const control = document.getElementById('eqControl').value.trim() || "N/A";
             const serie = document.getElementById('eqSerie').value.trim();
 
-            if (!equipo || !marca || !modelo || !serie) {
-                alert("Por favor completa los campos obligatorios: Nombre, Marca, Modelo y Número de Serie / Referencia.");
+            // Validación obligatoria que incluye el nombre del reporte
+            if (!nombreReporte || !equipo || !marca || !modelo || !serie) {
+                alert("Por favor completa los campos obligatorios: Nombre / Folio del Reporte, Nombre de Equipo, Marca, Modelo y Número de Serie / Referencia.");
                 return;
             }
 
             const infoStr = `${equipo} | Marca: ${marca} | Modelo: ${modelo} | Control: ${control} | Serie/Ref: ${serie}`;
-            
-            let contadorKey = `pruebaCount_${serie}`;
-            if (!localStorage.getItem(contadorKey)) {
-                localStorage.setItem(contadorKey, '0');
-            }
 
+            // Guardamos el título personalizado en lugar de usar un contador
+            localStorage.setItem('tituloReporteActivo', nombreReporte);
             localStorage.setItem('equipoActivo', infoStr);
             localStorage.setItem('serieActiva', serie);
             localStorage.setItem('seccionActiva', 'appContainer');
 
             document.getElementById('setupMenu').style.display = "none";
             document.getElementById('appContainer').style.display = "block";
-            document.getElementById('lblInfoEquipo').textContent = infoStr;
+            // Mostramos el nombre del reporte y los datos del equipo en el banner verde
+            document.getElementById('lblInfoEquipo').innerHTML = `<strong>${nombreReporte}</strong><br><span style="font-weight:normal;">${infoStr}</span>`;
+            
+            if (typeof window.limpiarPantalla === "function") {
+                window.limpiarPantalla();
+            }
         };
 
         window.volverAlMenuEquipo = function() {
             localStorage.setItem('seccionActiva', 'setupMenu');
             document.getElementById('appContainer').style.display = "none";
             document.getElementById('setupMenu').style.display = "block";
+            
+            // Opcional: Rellenar el campo del reporte con el valor previo al volver atrás
+            const tituloReporteGuardado = localStorage.getItem('tituloReporteActivo') || "";
+            if(tituloReporteGuardado) document.getElementById('eqNombreReporte').value = tituloReporteGuardado;
         };
 
         window.guardarPruebaActual = async function() {
             const contenido = document.getElementById('terminal').textContent.trim();
             const user = auth.currentUser;
             const fechaCal = document.getElementById('txtCalibDate').value;
-            const infoEquipo = document.getElementById('lblInfoEquipo').textContent;
+            // Obtenemos los datos puros del equipo (sin html)
+            const infoEquipo = localStorage.getItem('equipoActivo') || "No especificado";
 
-            if (!user || contenido.includes("Esperando conexión")) {
+            if (!user || contenido.includes("Esperando conexión") || contenido === "") {
                 alert("No hay datos válidos para guardar.");
                 return;
             }
 
-            const serieActiva = localStorage.getItem('serieActiva') || 'general';
-            let contadorKey = `pruebaCount_${serieActiva}`;
-            let numPrueba = parseInt(localStorage.getItem(contadorKey) || '0') + 1;
-            localStorage.setItem(contadorKey, numPrueba);
-            const tituloPrueba = `Prueba ${numPrueba}`;
+            // Tomamos el título que el usuario escribió manualmente
+            const tituloReporte = localStorage.getItem('tituloReporteActivo') || "Reporte sin título";
 
             try {
                 await addDoc(collection(db, "pruebas_fluke"), {
                     usuario: user.email,
-                    titulo: tituloPrueba,
+                    titulo: tituloReporte,
                     fecha: new Date().toLocaleString(),
                     datosEquipo: infoEquipo,
                     calibracionPatron: fechaCal,
@@ -454,7 +455,7 @@
                     datos: contenido,
                     timestamp: Date.now()
                 });
-                alert(`¡${tituloPrueba} guardada en la nube con éxito!`);
+                alert(`¡"${tituloReporte}" guardado en la nube con éxito!`);
             } catch (e) {
                 alert("Error al guardar en la nube: " + e.message);
             }
@@ -464,7 +465,6 @@
             const listaHistorialPrincipal = document.getElementById('listaHistorialPrincipal');
             if(listaHistorialPrincipal) listaHistorialPrincipal.innerHTML = "Cargando historial desde la nube...";
             
-            // Diccionario temporal para guardar los datos de las pruebas
             window.pruebasGuardadasTemp = {}; 
             
             try {
@@ -480,9 +480,8 @@
                 querySnapshot.forEach((docSnapshot) => {
                     const p = docSnapshot.data();
                     const docId = docSnapshot.id;
-                    const tituloDisplay = p.titulo || "Prueba Registrada";
+                    const tituloDisplay = p.titulo || "Reporte Guardado";
                     
-                    // Guardar la prueba en memoria
                     window.pruebasGuardadasTemp[docId] = p; 
 
                     html += `
@@ -505,18 +504,20 @@
         window.cargarPruebaEnTerminal = function(datosBase64) {
             window.irASeccion('home');
             const equipoGuardado = localStorage.getItem('equipoActivo') || "Equipo Registrado";
+            const tituloReporteGuardado = localStorage.getItem('tituloReporteActivo') || "";
+
             document.getElementById('appContainer').style.display = "block";
             document.getElementById('setupMenu').style.display = "none";
-            document.getElementById('lblInfoEquipo').textContent = equipoGuardado;
+            document.getElementById('lblInfoEquipo').innerHTML = tituloReporteGuardado ? `<strong>${tituloReporteGuardado}</strong><br><span style="font-weight:normal;">${equipoGuardado}</span>` : equipoGuardado;
             document.getElementById('terminal').textContent = atob(datosBase64);
             localStorage.setItem('seccionActiva', 'appContainer');
-            alert("Prueba cargada en la terminal.");
+            alert("Reporte cargado en la terminal.");
         };
 
         window.verPdfDirecto = function(docId) {
             const p = window.pruebasGuardadasTemp[docId];
             if (!p) {
-                alert("Error al obtener los datos de la prueba.");
+                alert("Error al obtener los datos.");
                 return;
             }
 
@@ -543,7 +544,7 @@
                 if (partes.length > 1) marcaTexto = partes[1].replace("Marca:", "").trim();
             }
 
-            const tituloPrueba = p.titulo || "Prueba Registrada";
+            const tituloPrueba = p.titulo || "Reporte Guardado";
             const fechaActual = p.fecha || "Fecha desconocida";
 
             const logoSrc = document.getElementById('cfgLogoPreview').src;
@@ -572,7 +573,7 @@
                     <body>
                         <div class="header-container">
                             <div>
-                                <h2>REPORTE TÉCNICO DE ${tituloPrueba.toUpperCase()}</h2>
+                                <h2>REPORTE TÉCNICO - ${tituloPrueba.toUpperCase()}</h2>
                                 <small>Analizador Biomédico</small>
                             </div>
                             <div class="logo-container">${mostrarLogo}</div>
@@ -584,7 +585,7 @@
                         <pre>${contenidoLimpio}</pre>
                         <div class="footer">
                             <div>Patrón: ${tipoFluke} | Calibración Patrón: ${fechaCal}</div>
-                            <div>Fecha original de la prueba: ${fechaActual}</div>
+                            <div>Fecha original: ${fechaActual}</div>
                         </div>
                         <script>
                             window.onload = function() { window.print(); }
@@ -608,97 +609,16 @@
     </script>
 
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f9;
-            margin: 0;
-            padding: 0;
-            color: #333;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-        .hamburger-btn {
-            position: fixed;
-            top: 15px;
-            left: 15px;
-            background: #003366;
-            color: white;
-            border: none;
-            padding: 10px 14px;
-            font-size: 18px;
-            border-radius: 6px;
-            cursor: pointer;
-            z-index: 1001;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-            display: none;
-        }
+        body { font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 0; color: #333; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .hamburger-btn { position: fixed; top: 15px; left: 15px; background: #003366; color: white; border: none; padding: 10px 14px; font-size: 18px; border-radius: 6px; cursor: pointer; z-index: 1001; box-shadow: 0 2px 6px rgba(0,0,0,0.2); display: none; }
         .hamburger-btn:hover { background: #002244; }
-
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: -260px;
-            width: 260px;
-            height: 100%;
-            background: #ffffff;
-            box-shadow: 4px 0 15px rgba(0,0,0,0.15);
-            z-index: 1002;
-            transition: left 0.3s ease;
-            display: flex;
-            flex-direction: column;
-        }
-        .sidebar-header {
-            background: #003366;
-            color: white;
-            padding: 20px;
-            font-size: 16px;
-            font-weight: bold;
-        }
-        .sidebar-menu-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            flex-grow: 1;
-            overflow-y: auto;
-        }
-        .sidebar-menu-list li a {
-            display: block;
-            padding: 15px 20px;
-            color: #333;
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: bold;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-        }
-        .sidebar-menu-list li a:hover {
-            background: #f0f4f8;
-            color: #007bff;
-        }
-        .menu-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.4);
-            z-index: 1000;
-            display: none;
-        }
-
-        .auth-card, .setup-card, .content-card {
-            background: #fff;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 500px;
-            box-sizing: border-box;
-            margin-top: 20px;
-            margin-bottom: 20px;
-        }
+        .sidebar { position: fixed; top: 0; left: -260px; width: 260px; height: 100%; background: #ffffff; box-shadow: 4px 0 15px rgba(0,0,0,0.15); z-index: 1002; transition: left 0.3s ease; display: flex; flex-direction: column; }
+        .sidebar-header { background: #003366; color: white; padding: 20px; font-size: 16px; font-weight: bold; }
+        .sidebar-menu-list { list-style: none; padding: 0; margin: 0; flex-grow: 1; overflow-y: auto; }
+        .sidebar-menu-list li a { display: block; padding: 15px 20px; color: #333; text-decoration: none; font-size: 14px; font-weight: bold; border-bottom: 1px solid #eee; cursor: pointer; }
+        .sidebar-menu-list li a:hover { background: #f0f4f8; color: #007bff; }
+        .menu-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1000; display: none; }
+        .auth-card, .setup-card, .content-card { background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 500px; box-sizing: border-box; margin-top: 20px; margin-bottom: 20px; }
         .auth-card h2, .setup-card h2, .content-card h2 { color: #003366; margin-top: 0; margin-bottom: 8px; text-align: center; }
         .auth-card p, .setup-card p, .content-card p { color: #666; font-size: 14px; margin-bottom: 20px; text-align: center; }
         .form-group { margin-bottom: 12px; }
@@ -710,31 +630,11 @@
         .btn-guest-login:hover { background-color: #5a6268; }
         .auth-switch { text-align: center; margin-top: 15px; font-size: 13px; color: #666; }
         .auth-switch a { color: #007bff; text-decoration: none; font-weight: bold; cursor: pointer; }
-
-        .measure-banner {
-            background: linear-gradient(135deg, #003366, #0056b3);
-            border-radius: 12px;
-            padding: 25px;
-            text-align: center;
-            cursor: pointer;
-            margin-top: 20px;
-            box-shadow: 0 4px 10px rgba(0,51,102,0.3);
-            transition: transform 0.2s;
-        }
+        .measure-banner { background: linear-gradient(135deg, #003366, #0056b3); border-radius: 12px; padding: 25px; text-align: center; cursor: pointer; margin-top: 20px; box-shadow: 0 4px 10px rgba(0,51,102,0.3); transition: transform 0.2s; }
         .measure-banner:hover { transform: translateY(-2px); }
         .measure-icon { font-size: 45px; margin-bottom: 5px; }
         .measure-text { color: #ffffff; font-size: 22px; font-weight: bold; letter-spacing: 1px; text-transform: uppercase; }
-
-        #appContainer, #savedHistoryView, #normasView, #seguridadView, #configView {
-            display: none;
-            max-width: 850px;
-            width: 95%;
-            background: #fff;
-            padding: 25px;
-            border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            margin: 40px auto;
-        }
+        #appContainer, #savedHistoryView, #normasView, #seguridadView, #configView { display: none; max-width: 850px; width: 95%; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin: 40px auto; }
         .top-bar { display: flex; justify-content: space-between; align-items: center; background: #e9ecef; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; font-size: 13px; }
         .equipment-summary { background: #e2f0d9; border: 1px solid #c8e6c9; padding: 10px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 15px; color: #2e7d32; font-weight: bold; }
         h1 { color: #003366; font-size: 20px; margin-top: 0; }
@@ -853,6 +753,12 @@
         <h2>Identificación del Equipo</h2>
         <p>Ingresa los datos del dispositivo bajo prueba</p>
         
+        <!-- NUEVO CAMPO OBLIGATORIO AÑADIDO AQUÍ -->
+        <div class="form-group">
+            <label>Nombre / Folio del Reporte *</label>
+            <input type="text" id="eqNombreReporte" class="form-control" placeholder="Ej. Mantenimiento Preventivo Oct-2026" />
+        </div>
+
         <div class="form-group">
             <label>Nombre del Equipo *</label>
             <input type="text" id="eqNombre" class="form-control" placeholder="Ej. Desfibrilador Bifásico" />
@@ -905,9 +811,9 @@
         <div class="buttons">
             <button id="btnConectar" onclick="conectarPuerto()">1. Conectar Puerto</button>
             <button id="btnDesconectar" onclick="desconectarPuerto()" disabled>Desconectar</button>
-            <button id="btnLimpiar" onclick="limpiarPantalla()">Limpiar Pantalla</button>
+            <button id="btnLimpiar" onclick="window.limpiarPantalla()">Limpiar Pantalla</button>
             <button id="btnPdf" onclick="generarPDF()">2. Generar PDF / Imprimir</button>
-            <button id="btnHistorial" onclick="window.guardarPruebaActual()">💾 Guardar en la Nube</button>
+            <button id="btnHistorial" onclick="window.guardarPruebaActual()">💾 Guardar Reporte en Nube</button>
         </div>
 
         <div id="terminal">Esperando conexión con el equipo...</div>
@@ -915,7 +821,7 @@
 
     <!-- SECCIÓN: PRUEBAS GUARDADAS -->
     <div id="savedHistoryView">
-        <h2>Pruebas Guardadas en la Nube</h2>
+        <h2>Reportes Guardados en la Nube</h2>
         <p>Historial centralizado de reportes clínicos</p>
         <div id="listaHistorialPrincipal">Cargando...</div>
     </div>
@@ -967,7 +873,6 @@
                 <button type="button" onclick="window.enviarCorreoCambioPassword()" style="background-color: #ffc107; color: #333; padding: 9px 12px; width: 100%; border-radius: 6px; font-size: 14px; font-weight: bold; border: none; cursor: pointer;">🔐 Enviar enlace para cambiar contraseña por Correo</button>
             </div>
 
-            <!-- Botón para eliminar cuenta por completo -->
             <div class="form-group" id="btnEliminarCuentaContainer" style="margin-top: 10px; margin-bottom: 20px;">
                 <button type="button" onclick="window.eliminarCuentaCompleta()" style="background-color: #dc3545; color: white; padding: 9px 12px; width: 100%; border-radius: 6px; font-size: 14px; font-weight: bold; border: none; cursor: pointer;">🗑️ Eliminar Cuenta y Datos por Completo</button>
             </div>
@@ -1018,7 +923,11 @@
     </div>
 
     <script>
+        // --- VARIABLES GLOBALES PARA EL SERIAL Y SEPARACIÓN DE PRUEBAS ---
         let port, reader, inputStreamClosed, keepReading = false;
+        let contadorTerminal = 1; 
+        let temporizadorInactividad; 
+        let nuevaPruebaLista = true; 
 
         async function conectarPuerto() {
             if (!("serial" in navigator)) {
@@ -1032,7 +941,11 @@
                 document.getElementById('lblEstado').className = "status connected";
                 document.getElementById('btnConectar').disabled = true;
                 document.getElementById('btnDesconectar').disabled = false;
+                
                 document.getElementById('terminal').textContent = ""; 
+                contadorTerminal = 1;
+                nuevaPruebaLista = true;
+                
                 keepReading = true;
                 leerDatos();
             } catch (error) {
@@ -1053,8 +966,21 @@
                         if (term.textContent.includes("Esperando conexión")) {
                             term.textContent = "";
                         }
+                        
+                        if (nuevaPruebaLista) {
+                            let separador = term.textContent === "" ? "" : "\n\n=================================\n";
+                            term.textContent += `${separador}👉 PRUEBA ${contadorTerminal}\n---------------------------------\n`;
+                            contadorTerminal++;
+                            nuevaPruebaLista = false;
+                        }
+
                         term.textContent += value;
                         term.scrollTop = term.scrollHeight;
+
+                        clearTimeout(temporizadorInactividad);
+                        temporizadorInactividad = setTimeout(() => {
+                            nuevaPruebaLista = true;
+                        }, 1000); 
                     }
                 }
             } catch (error) { console.error(error); }
@@ -1074,7 +1000,11 @@
             document.getElementById('btnDesconectar').disabled = true;
         }
 
-        function limpiarPantalla() { document.getElementById('terminal').textContent = ""; }
+        window.limpiarPantalla = function() { 
+            document.getElementById('terminal').textContent = ""; 
+            contadorTerminal = 1;
+            nuevaPruebaLista = true;
+        };
 
         function generarPDF() {
             let contenidoBruto = document.getElementById('terminal').textContent;
@@ -1093,7 +1023,7 @@
             const tipoFluke = document.getElementById('lblTipoFlukeSpan').textContent;
             const nombreResponsable = document.getElementById('cfgNombreUsuario').value.trim() || "Usuario";
             
-            const infoEquipoCompleta = document.getElementById('lblInfoEquipo').textContent;
+            const infoEquipoCompleta = localStorage.getItem('equipoActivo') || "No especificado";
             let equipoTexto = "No especificado";
             let marcaTexto = "No especificada";
             
@@ -1103,11 +1033,8 @@
                 if (partes.length > 1) marcaTexto = partes[1].replace("Marca:", "").trim();
             }
 
-            const serieActiva = localStorage.getItem('serieActiva') || 'general';
-            let contadorKey = `pruebaCount_${serieActiva}`;
-            let numPrueba = parseInt(localStorage.getItem(contadorKey) || '0') + 1;
-            localStorage.setItem(contadorKey, numPrueba);
-            const tituloPrueba = `Prueba ${numPrueba}`;
+            // Usamos el nombre que escribiste al inicio en lugar del contador
+            const tituloReporte = localStorage.getItem('tituloReporteActivo') || "Reporte Técnico";
 
             const logoSrc = document.getElementById('cfgLogoPreview').src;
             const tieneLogoValido = logoSrc && logoSrc.startsWith('data:image') && document.getElementById('cfgLogoPreview').style.display !== 'none';
@@ -1120,7 +1047,7 @@
                 <html lang="es">
                     <head>
                         <meta charset="UTF-8">
-                        <title>${tituloPrueba} - Reporte Técnico</title>
+                        <title>${tituloReporte} - Reporte Técnico</title>
                         <style>
                             @page {
                                 size: letter;
@@ -1185,8 +1112,8 @@
                     <body>
                         <div class="header-container">
                             <div>
-                                <h2>REPORTE TÉCNICO DE ${tituloPrueba.toUpperCase()}</h2>
-                                <small>Analizador Biomédico</small>
+                                <h2>REPORTE TÉCNICO DE MANTENIMIENTO</h2>
+                                <small>${tituloReporte.toUpperCase()} - Analizador Biomédico</small>
                             </div>
                             <div class="logo-container">${mostrarLogo}</div>
                         </div>
