@@ -464,6 +464,9 @@
             const listaHistorialPrincipal = document.getElementById('listaHistorialPrincipal');
             if(listaHistorialPrincipal) listaHistorialPrincipal.innerHTML = "Cargando historial desde la nube...";
             
+            // Diccionario temporal para guardar los datos de las pruebas
+            window.pruebasGuardadasTemp = {}; 
+            
             try {
                 const q = query(collection(db, "pruebas_fluke"), where("usuario", "==", email));
                 const querySnapshot = await getDocs(q);
@@ -478,10 +481,15 @@
                     const p = docSnapshot.data();
                     const docId = docSnapshot.id;
                     const tituloDisplay = p.titulo || "Prueba Registrada";
+                    
+                    // Guardar la prueba en memoria
+                    window.pruebasGuardadasTemp[docId] = p; 
+
                     html += `
                         <div class="history-item">
                             <span>🕒 <strong>${tituloDisplay}</strong> - ${p.fecha}<br><small>${p.datosEquipo || ''}</small></span>
-                            <div>
+                            <div style="display: flex; gap: 5px;">
+                                <button onclick="window.verPdfDirecto('${docId}')" style="background-color: #28a745; padding: 5px 10px; font-size: 12px; color:white; border:none; border-radius:4px; cursor:pointer;">Ver PDF</button>
                                 <button onclick="window.cargarPruebaEnTerminal('${btoa(p.datos)}')" style="background-color: #007bff; padding: 5px 10px; font-size: 12px; color:white; border:none; border-radius:4px; cursor:pointer;">Cargar</button>
                                 <button onclick="window.eliminarPruebaCloud('${docId}', '${email}')" style="background-color: #dc3545; padding: 5px 10px; font-size: 12px; color:white; border:none; border-radius:4px; cursor:pointer;">Eliminar</button>
                             </div>
@@ -503,6 +511,88 @@
             document.getElementById('terminal').textContent = atob(datosBase64);
             localStorage.setItem('seccionActiva', 'appContainer');
             alert("Prueba cargada en la terminal.");
+        };
+
+        window.verPdfDirecto = function(docId) {
+            const p = window.pruebasGuardadasTemp[docId];
+            if (!p) {
+                alert("Error al obtener los datos de la prueba.");
+                return;
+            }
+
+            let contenidoBruto = p.datos;
+            let lineas = contenidoBruto.split('\n');
+            let lineasFiltradas = lineas.filter(linea => {
+                let l = linea.toLowerCase();
+                return !l.includes("esperando conexión") && 
+                       !l.includes("conexión establecida") && 
+                       !l.includes("conectado") && 
+                       !l.includes("desconectado");
+            });
+            let contenidoLimpio = lineasFiltradas.join('\n').trim();
+
+            const fechaCal = p.calibracionPatron || "No especificada";
+            const tipoFluke = p.tipoFluke || "No especificado";
+            const nombreResponsable = document.getElementById('cfgNombreUsuario').value.trim() || p.usuario;
+            
+            let equipoTexto = "No especificado";
+            let marcaTexto = "No especificada";
+            if (p.datosEquipo) {
+                const partes = p.datosEquipo.split('|');
+                if (partes.length > 0) equipoTexto = partes[0].trim();
+                if (partes.length > 1) marcaTexto = partes[1].replace("Marca:", "").trim();
+            }
+
+            const tituloPrueba = p.titulo || "Prueba Registrada";
+            const fechaActual = p.fecha || "Fecha desconocida";
+
+            const logoSrc = document.getElementById('cfgLogoPreview').src;
+            const tieneLogoValido = logoSrc && logoSrc.startsWith('data:image') && document.getElementById('cfgLogoPreview').style.display !== 'none';
+            const mostrarLogo = tieneLogoValido ? `<img src="${logoSrc}" style="max-height: 50px; max-width: 150px;">` : '';
+
+            const ventanaImpresion = window.open('', '', 'width=900,height=700');
+            ventanaImpresion.document.write(`
+                <!DOCTYPE html>
+                <html lang="es">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>${tituloPrueba} - Reporte Técnico</title>
+                        <style>
+                            @page { size: letter; margin: 10mm; }
+                            body { font-family: Arial, sans-serif; margin: 0; padding: 0 0 40px 0; font-size: 11px; color: #333; line-height: 1.3; }
+                            .header-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #003366; padding-bottom: 8px; margin-bottom: 12px; }
+                            h2 { margin: 0; color: #003366; font-size: 16px; }
+                            .logo-container { margin-left: auto; text-align: right; }
+                            .meta-info { background: #f4f6f9; border: 1px solid #ddd; padding: 8px; border-radius: 4px; margin-bottom: 12px; }
+                            .meta-info p { margin: 3px 0; }
+                            pre { background: #fff; border: 1px solid #ccc; padding: 10px; font-family: 'Courier New', Courier, monospace; font-size: 10px; border-radius: 4px; white-space: pre-wrap; word-break: break-all; margin-bottom: 15px; }
+                            .footer { position: fixed; bottom: 0; left: 0; right: 0; width: 100%; font-size: 10px; color: #444; border-top: 1px solid #999; padding-top: 5px; display: flex; justify-content: space-between; background: #fff; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header-container">
+                            <div>
+                                <h2>REPORTE TÉCNICO DE ${tituloPrueba.toUpperCase()}</h2>
+                                <small>Analizador Biomédico</small>
+                            </div>
+                            <div class="logo-container">${mostrarLogo}</div>
+                        </div>
+                        <div class="meta-info">
+                            <p><strong>Responsable:</strong> ${nombreResponsable}</p>
+                            <p><strong>Equipo:</strong> ${equipoTexto} | <strong>Marca:</strong> ${marcaTexto}</p>
+                        </div>
+                        <pre>${contenidoLimpio}</pre>
+                        <div class="footer">
+                            <div>Patrón: ${tipoFluke} | Calibración Patrón: ${fechaCal}</div>
+                            <div>Fecha original de la prueba: ${fechaActual}</div>
+                        </div>
+                        <script>
+                            window.onload = function() { window.print(); }
+                        <\/script>
+                    </body>
+                </html>
+            `);
+            ventanaImpresion.document.close();
         };
 
         window.eliminarPruebaCloud = async function(docId, email) {
