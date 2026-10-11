@@ -120,11 +120,6 @@
         window.generarPDF = function() {
             let contenidoBruto = document.getElementById('terminal').textContent;
             
-            if (contenidoBruto.includes("Esperando conexión") || contenidoBruto.trim() === "") {
-                alert("⚠️ No hay datos en la pantalla para generar el PDF. Por favor, realiza una prueba primero.");
-                return;
-            }
-
             let lineas = contenidoBruto.split('\n');
             let lineasFiltradas = lineas.filter(linea => {
                 let l = linea.toLowerCase();
@@ -610,11 +605,6 @@
 
             if (!user) {
                 alert("Debes iniciar sesión para guardar en la nube.");
-                return;
-            }
-
-            if (contenido.includes("Esperando conexión") || contenido === "") {
-                alert("⚠️ No hay datos válidos para guardar. Asegúrate de conectar el equipo y realizar una prueba primero.");
                 return;
             }
 
