@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Capturador Analizador - Cloud</title>
     
-    <!-- SDKs de Firebase -->
+    <!-- SDKs de Firebase y Funciones unificadas -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateEmail, sendPasswordResetEmail, sendEmailVerification, deleteUser } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
@@ -25,7 +25,196 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // Funciones de Autenticación
+        // --- VARIABLES GLOBALES PARA EL PUERTO SERIAL ---
+        let port, reader, inputStreamClosed;
+        let keepReading = false;
+        let contadorTerminal = 1; 
+        let temporizadorInactividad; 
+        let nuevaPruebaLista = true; 
+
+        // --- FUNCIONES DE PUERTO SERIAL Y BOTONES (Asignadas a window para evitar bloqueos) ---
+        window.conectarPuerto = async function() {
+            if (!("serial" in navigator)) {
+                alert("❌ Tu navegador o dispositivo no soporta la conexión por cable USB (Web Serial API). Debes usar Google Chrome o Microsoft Edge en una computadora (Windows/Mac).");
+                return;
+            }
+            try {
+                port = await navigator.serial.requestPort({ filters: [{ usbVendorId: 0x0403, usbProductId: 0x6001 }] });
+                await port.open({ baudRate: 115200 });
+                document.getElementById('lblEstado').textContent = "Conectado";
+                document.getElementById('lblEstado').className = "status connected";
+                document.getElementById('btnConectar').disabled = true;
+                document.getElementById('btnDesconectar').disabled = false;
+                
+                document.getElementById('terminal').textContent = ""; 
+                contadorTerminal = 1;
+                nuevaPruebaLista = true;
+                
+                keepReading = true;
+                leerDatos();
+            } catch (error) {
+                console.error(error);
+                alert("No se pudo establecer la conexión: " + error.message);
+            }
+        };
+
+        async function leerDatos() {
+            const textDecoder = new TextDecoderStream();
+            inputStreamClosed = port.readable.pipeTo(textDecoder.writable);
+            reader = textDecoder.readable.getReader();
+            try {
+                while (keepReading) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    if (value) {
+                        const term = document.getElementById('terminal');
+                        if (term.textContent.includes("Esperando conexión")) {
+                            term.textContent = "";
+                        }
+                        
+                        if (nuevaPruebaLista) {
+                            let separador = term.textContent === "" ? "" : "\n\n=================================\n";
+                            term.textContent += `${separador}👉 PRUEBA ${contadorTerminal}\n---------------------------------\n`;
+                            contadorTerminal++;
+                            nuevaPruebaLista = false;
+                        }
+
+                        term.textContent += value;
+                        term.scrollTop = term.scrollHeight;
+
+                        clearTimeout(temporizadorInactividad);
+                        temporizadorInactividad = setTimeout(() => {
+                            nuevaPruebaLista = true;
+                        }, 1000); 
+                    }
+                }
+            } catch (error) { 
+                console.error(error); 
+            } finally { 
+                reader.releaseLock(); 
+            }
+        }
+
+        window.desconectarPuerto = async function() {
+            keepReading = false;
+            try {
+                if (reader) await reader.cancel();
+                if (inputStreamClosed) await inputStreamClosed.catch(() => {});
+                if (port) await port.close();
+            } catch (error) { 
+                console.error(error); 
+            }
+            document.getElementById('lblEstado').textContent = "Desconectado";
+            document.getElementById('lblEstado').className = "status disconnected";
+            document.getElementById('btnConectar').disabled = false;
+            document.getElementById('btnDesconectar').disabled = true;
+            alert("Equipo desconectado correctamente.");
+        };
+
+        window.limpiarPantalla = function() { 
+            document.getElementById('terminal').textContent = ""; 
+            contadorTerminal = 1;
+            nuevaPruebaLista = true;
+        };
+
+        window.generarPDF = function() {
+            let contenidoBruto = document.getElementById('terminal').textContent;
+            
+            if (contenidoBruto.includes("Esperando conexión") || contenidoBruto.trim() === "") {
+                alert("⚠️ No hay datos en la pantalla para generar el PDF. Por favor, realiza una prueba primero.");
+                return;
+            }
+
+            let lineas = contenidoBruto.split('\n');
+            let lineasFiltradas = lineas.filter(linea => {
+                let l = linea.toLowerCase();
+                return !l.includes("esperando conexión") && 
+                       !l.includes("conexión establecida") && 
+                       !l.includes("conectado") && 
+                       !l.includes("desconectado");
+            });
+            let contenidoLimpio = lineasFiltradas.join('\n').trim();
+
+            const fechaCal = document.getElementById('txtCalibDate').value || "No especificada";
+            const tipoFluke = document.getElementById('lblTipoFlukeSpan').textContent;
+            const nombreResponsable = document.getElementById('cfgNombreUsuario').value.trim() || "Usuario";
+            
+            const infoEquipoCompleta = localStorage.getItem('equipoActivo') || "";
+            let equipoTexto = "No especificado";
+            let marcaTexto = "No especificada";
+            let modeloTexto = "No especificado";
+            let controlTexto = "N/A";
+            let serieTexto = "No especificada";
+            
+            if (infoEquipoCompleta) {
+                const partes = infoEquipoCompleta.split('|');
+                if (partes.length > 0) equipoTexto = partes[0].trim();
+                if (partes.length > 1) marcaTexto = partes[1].replace("Marca:", "").trim();
+                if (partes.length > 2) modeloTexto = partes[2].replace("Modelo:", "").trim();
+                if (partes.length > 3) controlTexto = partes[3].replace("Control:", "").trim();
+                if (partes.length > 4) serieTexto = partes[4].replace("Serie/Ref:", "").trim();
+            }
+
+            if (!controlTexto || controlTexto.trim() === "") {
+                controlTexto = "N/A";
+            }
+
+            const tituloReporte = localStorage.getItem('tituloReporteActivo') || "Reporte Técnico";
+            const logoSrc = document.getElementById('cfgLogoPreview').src;
+            const tieneLogoValido = logoSrc && logoSrc.startsWith('data:image') && document.getElementById('cfgLogoPreview').style.display !== 'none';
+            const mostrarLogo = tieneLogoValido ? `<img src="${logoSrc}" style="max-height: 50px; max-width: 150px;">` : '';
+            const fechaActual = new Date().toLocaleDateString();
+
+            const ventanaImpresion = window.open('', '', 'width=900,height=700');
+            ventanaImpresion.document.write(`
+                <!DOCTYPE html>
+                <html lang="es">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>${tituloReporte} - Reporte Técnico</title>
+                        <style>
+                            @page { size: letter; margin: 10mm; }
+                            body { font-family: Arial, sans-serif; margin: 0; padding: 0 0 40px 0; font-size: 11px; color: #333; line-height: 1.3; }
+                            .header-container { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #003366; padding-bottom: 8px; margin-bottom: 12px; }
+                            h2 { margin: 0; color: #003366; font-size: 16px; }
+                            .logo-container { margin-left: auto; text-align: right; }
+                            .meta-info { background: #f4f6f9; border: 1px solid #ddd; padding: 8px; border-radius: 4px; margin-bottom: 12px; }
+                            .meta-info p { margin: 3px 0; }
+                            pre { background: #fff; border: 1px solid #ccc; padding: 10px; font-family: 'Courier New', Courier, monospace; font-size: 10px; border-radius: 4px; white-space: pre-wrap; word-break: break-all; margin-bottom: 15px; }
+                            .footer { position: fixed; bottom: 0; left: 0; right: 0; width: 100%; font-size: 10px; color: #444; border-top: 1px solid #999; padding-top: 5px; display: flex; justify-content: space-between; background: #fff; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header-container">
+                            <div>
+                                <h2>REPORTE TÉCNICO DE MANTENIMIENTO</h2>
+                                <small>${tituloReporte.toUpperCase()} - Analizador Biomédico</small>
+                            </div>
+                            <div class="logo-container">${mostrarLogo}</div>
+                        </div>
+
+                        <div class="meta-info">
+                            <p><strong>Responsable:</strong> ${nombreResponsable}</p>
+                            <p><strong>Equipo:</strong> ${equipoTexto} | <strong>Marca:</strong> ${marcaTexto} | <strong>Modelo:</strong> ${modeloTexto} | <strong>Serie:</strong> ${serieTexto} | <strong>Control:</strong> ${controlTexto}</p>
+                        </div>
+
+                        <pre>${contenidoLimpio}</pre>
+
+                        <div class="footer">
+                            <div>Patrón: ${tipoFluke} | Calibración Patrón: ${fechaCal}</div>
+                            <div>Fecha Emisión: ${fechaActual}</div>
+                        </div>
+
+                        <script>
+                            window.onload = function() { window.print(); }
+                        <\/script>
+                    </body>
+                </html>
+            `);
+            ventanaImpresion.document.close();
+        };
+
+        // --- FUNCIONES DE AUTENTICACIÓN Y NAVEGACIÓN ---
         window.registrarUsuario = async function() {
             const email = document.getElementById('regId').value.trim();
             const pass = document.getElementById('regPass').value.trim();
@@ -57,19 +246,15 @@
             try {
                 const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
                 const user = userCredential.user;
-
                 await sendEmailVerification(user);
-
                 await setDoc(doc(db, "usuarios_config", email), {
                     nombreUsuario: email.split('@')[0],
                     calibracion: fechaCal,
                     tipoFluke: tipoFlukeVal,
                     logoUrl: ""
                 });
-
                 alert("¡Cuenta registrada con éxito! Te hemos enviado un correo electrónico de verificación.");
                 await signOut(auth);
-
                 document.getElementById('registerCard').style.display = 'none';
                 document.getElementById('loginCard').style.display = 'block';
             } catch (error) {
@@ -91,7 +276,7 @@
         window.cerrarSesion = async function() {
             localStorage.clear();
             await signOut(auth);
-            cerrarMenuLateral();
+            window.cerrarMenuLateral();
         };
 
         window.eliminarCuentaCompleta = async function() {
@@ -108,10 +293,8 @@
                         batch.delete(docSnap.ref);
                     });
                     await batch.commit();
-
                     await deleteDoc(doc(db, "usuarios_config", email));
                     await deleteUser(user);
-
                     localStorage.clear();
                     alert("Tu cuenta y todos sus datos han sido eliminados por completo.");
                 } catch (error) {
@@ -132,7 +315,6 @@
             document.getElementById('otroPatronContainer').style.display = "none";
             document.getElementById('btnCambiarPass').style.display = "none";
             document.getElementById('btnEliminarCuentaContainer').style.display = "none";
-            
             localStorage.setItem('seccionActiva', 'setupMenu');
         };
 
@@ -170,7 +352,6 @@
                 } else {
                     document.getElementById('setupMenu').style.display = "block";
                 }
-
             } else {
                 document.getElementById('setupMenu').style.display = "none";
                 document.getElementById('appContainer').style.display = "none";
@@ -268,14 +449,12 @@
             if (correo && correo !== user.email) {
                 await updateEmail(user, correo);
             }
-
             await setDoc(doc(db, "usuarios_config", user.email), {
                 nombreUsuario: nombre,
                 calibracion: calib,
                 tipoFluke: tipoFluke,
                 logoUrl: logo
             }, { merge: true });
-
             alert("¡Configuración guardada exitosamente!");
             document.getElementById('lblUsuarioActivo').textContent = user.email;
             document.getElementById('txtCalibDate').value = calib;
@@ -335,7 +514,7 @@
             const sidebar = document.getElementById('sidebarMenu');
             const overlay = document.getElementById('menuOverlay');
             if (sidebar.style.left === '0px') {
-                cerrarMenuLateral();
+                window.cerrarMenuLateral();
             } else {
                 sidebar.style.left = '0px';
                 overlay.style.display = 'block';
@@ -348,7 +527,7 @@
         };
 
         window.irASeccion = function(seccionId) {
-            cerrarMenuLateral();
+            window.cerrarMenuLateral();
             document.getElementById('setupMenu').style.display = 'none';
             document.getElementById('appContainer').style.display = 'none';
             document.getElementById('savedHistoryView').style.display = 'none';
@@ -411,9 +590,7 @@
             document.getElementById('appContainer').style.display = "block";
             document.getElementById('lblInfoEquipo').innerHTML = `<strong>${nombreReporte}</strong><br><span style="font-weight:normal;">${infoStr}</span>`;
             
-            if (typeof window.limpiarPantalla === "function") {
-                window.limpiarPantalla();
-            }
+            window.limpiarPantalla();
         };
 
         window.volverAlMenuEquipo = function() {
@@ -431,8 +608,13 @@
             const fechaCal = document.getElementById('txtCalibDate').value;
             const infoEquipo = localStorage.getItem('equipoActivo') || "No especificado";
 
-            if (!user || contenido.includes("Esperando conexión") || contenido === "") {
-                alert("No hay datos válidos para guardar.");
+            if (!user) {
+                alert("Debes iniciar sesión para guardar en la nube.");
+                return;
+            }
+
+            if (contenido.includes("Esperando conexión") || contenido === "") {
+                alert("⚠️ No hay datos válidos para guardar. Asegúrate de conectar el equipo y realizar una prueba primero.");
                 return;
             }
 
@@ -458,7 +640,6 @@
         async function cargarHistorialCloud(email) {
             const listaHistorialPrincipal = document.getElementById('listaHistorialPrincipal');
             if(listaHistorialPrincipal) listaHistorialPrincipal.innerHTML = "Cargando historial desde la nube...";
-            
             window.pruebasGuardadasTemp = {}; 
             
             try {
@@ -475,7 +656,6 @@
                     const p = docSnapshot.data();
                     const docId = docSnapshot.id;
                     const tituloDisplay = p.titulo || "Reporte Guardado";
-                    
                     window.pruebasGuardadasTemp[docId] = p; 
 
                     html += `
@@ -505,13 +685,13 @@
             document.getElementById('lblInfoEquipo').innerHTML = tituloReporteGuardado ? `<strong>${tituloReporteGuardado}</strong><br><span style="font-weight:normal;">${equipoGuardado}</span>` : equipoGuardado;
             document.getElementById('terminal').textContent = atob(datosBase64);
             localStorage.setItem('seccionActiva', 'appContainer');
-            alert("Reporte cargado en la terminal.");
+            alert("Reporte cargado correctamente en la pantalla de edición.");
         };
 
         window.verPdfDirecto = function(docId) {
             const p = window.pruebasGuardadasTemp[docId];
             if (!p) {
-                alert("Error al obtener los datos.");
+                alert("Error al obtener los datos de esta prueba.");
                 return;
             }
 
@@ -530,7 +710,6 @@
             const tipoFluke = p.tipoFluke || "No especificado";
             const nombreResponsable = document.getElementById('cfgNombreUsuario').value.trim() || p.usuario;
             
-            // Separación de datos para el historial
             const infoEquipoCompleta = p.datosEquipo || "";
             let equipoTexto = "No especificado";
             let marcaTexto = "No especificada";
@@ -545,6 +724,10 @@
                 if (partes.length > 2) modeloTexto = partes[2].replace("Modelo:", "").trim();
                 if (partes.length > 3) controlTexto = partes[3].replace("Control:", "").trim();
                 if (partes.length > 4) serieTexto = partes[4].replace("Serie/Ref:", "").trim();
+            }
+
+            if (!controlTexto || controlTexto.trim() === "") {
+                controlTexto = "N/A";
             }
 
             const tituloPrueba = p.titulo || "Reporte Guardado";
@@ -604,6 +787,7 @@
                 try {
                     await deleteDoc(doc(db, "pruebas_fluke", docId));
                     cargarHistorialCloud(email);
+                    alert("Reporte eliminado.");
                 } catch (e) {
                     alert("Error al eliminar: " + e.message);
                 }
@@ -698,7 +882,6 @@
     <div id="registerCard" class="auth-card" style="display: none;">
         <h2>Registro en la Nube</h2>
         <p>Crea tu cuenta institucional y verifica tu correo</p>
-        
         <div class="form-group">
             <label>Correo Electrónico *</label>
             <input type="email" id="regId" class="form-control" placeholder="ejemplo@correo.com" />
@@ -721,33 +904,17 @@
                 <option value="OTRO">Otro (Personalizado)</option>
             </select>
         </div>
-
         <div id="regOtroPatronContainer" style="display: none; background: #e9ecef; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
-            <label style="font-size:12px; font-weight:bold; color:#003366; margin-bottom:8px; display:block;">Especificar Patrón Personalizado:</label>
-            <div class="form-group">
-                <label>Nombre del Equipo / Patrón *</label>
-                <input type="text" id="regOtroNombre" class="form-control" placeholder="Ej. Simulador / Analizador X" />
-            </div>
-            <div class="form-group">
-                <label>Marca *</label>
-                <input type="text" id="regOtroMarca" class="form-control" placeholder="Ej. Marca del equipo" />
-            </div>
-            <div class="form-group">
-                <label>Modelo (Opcional)</label>
-                <input type="text" id="regOtroModelo" class="form-control" placeholder="Ej. Modelo X" />
-            </div>
-            <div class="form-group">
-                <label>Número de Serie (Opcional)</label>
-                <input type="text" id="regOtroSerie" class="form-control" placeholder="Ej. SN-0000" />
-            </div>
+            <div class="form-group"><label>Nombre del Equipo / Patrón *</label><input type="text" id="regOtroNombre" class="form-control" /></div>
+            <div class="form-group"><label>Marca *</label><input type="text" id="regOtroMarca" class="form-control" /></div>
+            <div class="form-group"><label>Modelo (Opcional)</label><input type="text" id="regOtroModelo" class="form-control" /></div>
+            <div class="form-group"><label>Número de Serie (Opcional)</label><input type="text" id="regOtroSerie" class="form-control" /></div>
         </div>
-
         <div class="form-group">
             <label>📅 Fecha de Calibración del Patrón *</label>
             <input type="date" id="regCalibDate" class="form-control" />
         </div>
-
-        <button class="btn-auth" onclick="window.registrarUsuario()" style="background-color: #28a745;">Completar Registro y Verificar Correo</button>
+        <button class="btn-auth" onclick="window.registrarUsuario()" style="background-color: #28a745;">Completar Registro y Verificar</button>
         <div class="auth-switch">¿Ya tienes cuenta? <a onclick="document.getElementById('registerCard').style.display='none'; document.getElementById('loginCard').style.display='block';">Inicia sesión</a></div>
     </div>
 
@@ -755,32 +922,12 @@
     <div id="setupMenu" class="setup-card" style="display: none;">
         <h2>Identificación del Equipo</h2>
         <p>Ingresa los datos del dispositivo bajo prueba</p>
-        
-        <div class="form-group">
-            <label>Nombre / Folio del Reporte *</label>
-            <input type="text" id="eqNombreReporte" class="form-control" placeholder="Ej. Mantenimiento Preventivo Oct-2026" />
-        </div>
-
-        <div class="form-group">
-            <label>Nombre del Equipo *</label>
-            <input type="text" id="eqNombre" class="form-control" placeholder="Ej. Desfibrilador Bifásico" />
-        </div>
-        <div class="form-group">
-            <label>Marca *</label>
-            <input type="text" id="eqMarca" class="form-control" placeholder="Ej. Philips / Zoll / Mindray" />
-        </div>
-        <div class="form-group">
-            <label>Modelo *</label>
-            <input type="text" id="eqModelo" class="form-control" placeholder="Ej. BeneHeart D6" />
-        </div>
-        <div class="form-group">
-            <label>Número de Control (Opcional)</label>
-            <input type="text" id="eqControl" class="form-control" placeholder="Ej. NC-10492 (Opcional)" />
-        </div>
-        <div class="form-group">
-            <label>Número de Serie / Referencia *</label>
-            <input type="text" id="eqSerie" class="form-control" placeholder="Ej. SN-8839201" />
-        </div>
+        <div class="form-group"><label>Nombre / Folio del Reporte *</label><input type="text" id="eqNombreReporte" class="form-control" /></div>
+        <div class="form-group"><label>Nombre del Equipo *</label><input type="text" id="eqNombre" class="form-control" /></div>
+        <div class="form-group"><label>Marca *</label><input type="text" id="eqMarca" class="form-control" /></div>
+        <div class="form-group"><label>Modelo *</label><input type="text" id="eqModelo" class="form-control" /></div>
+        <div class="form-group"><label>Número de Control (Opcional)</label><input type="text" id="eqControl" class="form-control" /></div>
+        <div class="form-group"><label>Número de Serie / Referencia *</label><input type="text" id="eqSerie" class="form-control" /></div>
 
         <div class="measure-banner" onclick="window.irAPantallaMedicion()">
             <div class="measure-icon">⚡</div>
@@ -792,7 +939,7 @@
     <div id="appContainer">
         <div class="top-bar">
             <div>👤 Cuenta Cloud: <strong id="lblUsuarioActivo"></strong></div>
-            <button onclick="window.volverAlMenuEquipo()" style="background-color: #17a2b8; padding: 5px 10px; font-size: 12px;">Editar Datos Equipo</button>
+            <button onclick="window.volverAlMenuEquipo()" style="background-color: #17a2b8; padding: 5px 10px; font-size: 12px; color: white; border: none; border-radius: 4px; cursor: pointer;">Editar Datos Equipo</button>
         </div>
 
         <div id="lblInfoEquipo" class="equipment-summary"></div>
@@ -811,10 +958,10 @@
         </div>
 
         <div class="buttons">
-            <button id="btnConectar" onclick="conectarPuerto()">1. Conectar Puerto</button>
-            <button id="btnDesconectar" onclick="desconectarPuerto()" disabled>Desconectar</button>
+            <button id="btnConectar" onclick="window.conectarPuerto()">1. Conectar Puerto</button>
+            <button id="btnDesconectar" onclick="window.desconectarPuerto()" disabled>Desconectar</button>
             <button id="btnLimpiar" onclick="window.limpiarPantalla()">Limpiar Pantalla</button>
-            <button id="btnPdf" onclick="generarPDF()">2. Generar PDF / Imprimir</button>
+            <button id="btnPdf" onclick="window.generarPDF()">2. Generar PDF / Imprimir</button>
             <button id="btnHistorial" onclick="window.guardarPruebaActual()">💾 Guardar Reporte en Nube</button>
         </div>
 
@@ -824,14 +971,12 @@
     <!-- SECCIÓN: PRUEBAS GUARDADAS -->
     <div id="savedHistoryView">
         <h2>Reportes Guardados en la Nube</h2>
-        <p>Historial centralizado de reportes clínicos</p>
         <div id="listaHistorialPrincipal">Cargando...</div>
     </div>
 
     <!-- SECCIÓN: NORMATIVAS -->
     <div id="normasView">
         <h2>Normativas de Referencia</h2>
-        <p>Estándares aplicables a equipos electromédicos y desfibriladores</p>
         <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; font-size: 14px; line-height: 1.6;">
             <ul>
                 <li><strong>IEC 60601-1:</strong> Requisitos generales para la seguridad básica y funcionamiento esencial de equipos electromédicos.</li>
@@ -844,7 +989,6 @@
     <!-- SECCIÓN: VALIDACIÓN DE PRUEBAS DE SEGURIDAD -->
     <div id="seguridadView">
         <h2>Validación Pruebas de Seguridad</h2>
-        <p>Criterios de aceptación para liberación de equipos</p>
         <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; font-size: 14px; line-height: 1.6;">
             <p><strong>Parámetros críticos evaluados por el analizador:</strong></p>
             <ul>
@@ -859,26 +1003,15 @@
     <!-- SECCIÓN: CONFIGURACIÓN -->
     <div id="configView">
         <h2>Configuración de Cuenta y Patrón</h2>
-        <p>Personaliza tus datos de usuario, credenciales, equipo patrón y logotipo para reportes</p>
         <div style="background: #f8f9fa; padding: 20px; border-radius: 6px;">
-            <div class="form-group">
-                <label>Nombre de Usuario / Ingeniero Responsable</label>
-                <input type="text" id="cfgNombreUsuario" class="form-control" placeholder="Ej. Ing. Carlos Mendoza" />
-            </div>
-            <div class="form-group">
-                <label>Correo Electrónico (Cloud)</label>
-                <input type="email" id="cfgCorreo" class="form-control" placeholder="correo@hospital.com" />
-            </div>
-
+            <div class="form-group"><label>Nombre de Usuario / Ingeniero</label><input type="text" id="cfgNombreUsuario" class="form-control" /></div>
+            <div class="form-group"><label>Correo Electrónico (Cloud)</label><input type="email" id="cfgCorreo" class="form-control" /></div>
             <div class="form-group" id="btnCambiarPass" style="margin-top: 15px; margin-bottom: 15px;">
-                <label>Seguridad de la Cuenta</label>
-                <button type="button" onclick="window.enviarCorreoCambioPassword()" style="background-color: #ffc107; color: #333; padding: 9px 12px; width: 100%; border-radius: 6px; font-size: 14px; font-weight: bold; border: none; cursor: pointer;">🔐 Enviar enlace para cambiar contraseña por Correo</button>
+                <button type="button" onclick="window.enviarCorreoCambioPassword()" style="background-color: #ffc107; color: #333; padding: 9px 12px; width: 100%; border-radius: 6px; font-size: 14px; font-weight: bold; border: none; cursor: pointer;">🔐 Enviar enlace para cambiar contraseña</button>
             </div>
-
             <div class="form-group" id="btnEliminarCuentaContainer" style="margin-top: 10px; margin-bottom: 20px;">
-                <button type="button" onclick="window.eliminarCuentaCompleta()" style="background-color: #dc3545; color: white; padding: 9px 12px; width: 100%; border-radius: 6px; font-size: 14px; font-weight: bold; border: none; cursor: pointer;">🗑️ Eliminar Cuenta y Datos por Completo</button>
+                <button type="button" onclick="window.eliminarCuentaCompleta()" style="background-color: #dc3545; color: white; padding: 9px 12px; width: 100%; border-radius: 6px; font-size: 14px; font-weight: bold; border: none; cursor: pointer;">🗑️ Eliminar Cuenta por Completo</button>
             </div>
-
             <div class="form-group">
                 <label>⚡ Tipo de Analizador (Patrón)</label>
                 <select id="cfgTipoFluke" class="form-control" onchange="window.verificarTipoFluke()">
@@ -889,70 +1022,20 @@
                     <option value="OTRO">Otro (Personalizado)</option>
                 </select>
             </div>
-
             <div id="otroPatronContainer" style="display: none; background: #e9ecef; padding: 12px; border-radius: 6px; margin-bottom: 12px;">
-                <label style="font-size:12px; font-weight:bold; color:#003366; margin-bottom:8px; display:block;">Especificar Patrón Personalizado:</label>
-                <div class="form-group">
-                    <label>Nombre del Equipo / Patrón</label>
-                    <input type="text" id="otroNombre" class="form-control" placeholder="Ej. Simulador / Analizador X" />
-                </div>
-                <div class="form-group">
-                    <label>Marca</label>
-                    <input type="text" id="otroMarca" class="form-control" placeholder="Ej. Marca del equipo" />
-                </div>
-                <div class="form-group">
-                    <label>Modelo (Opcional)</label>
-                    <input type="text" id="otroModelo" class="form-control" placeholder="Ej. Modelo X" />
-                </div>
-                <div class="form-group">
-                    <label>Número de Serie (Opcional)</label>
-                    <input type="text" id="otroSerie" class="form-control" placeholder="Ej. SN-0000" />
-                </div>
+                <div class="form-group"><label>Nombre del Equipo</label><input type="text" id="otroNombre" class="form-control" /></div>
+                <div class="form-group"><label>Marca</label><input type="text" id="otroMarca" class="form-control" /></div>
+                <div class="form-group"><label>Modelo</label><input type="text" id="otroModelo" class="form-control" /></div>
+                <div class="form-group"><label>Número de Serie</label><input type="text" id="otroSerie" class="form-control" /></div>
             </div>
-
-            <div class="form-group">
-                <label>📅 Fecha de Calibración del Patrón</label>
-                <input type="date" id="cfgCalibDate" class="form-control" />
-            </div>
+            <div class="form-group"><label>📅 Fecha de Calibración del Patrón</label><input type="date" id="cfgCalibDate" class="form-control" /></div>
             <div class="form-group">
                 <label>Logotipo Institucional (Para membrete de PDF)</label>
-                <input type="file" id="cfgLogoInput" class="form-control" accept="image/*" />
-                <br>
-                <img id="cfgLogoPreview" class="logo-preview" alt="Vista previa del logo" />
+                <input type="file" id="cfgLogoInput" class="form-control" accept="image/*" /><br>
+                <img id="cfgLogoPreview" class="logo-preview" alt="Vista previa" />
             </div>
             <button class="btn-auth" onclick="window.guardarConfiguracionPerfil()" style="background-color: #28a745;">Guardar Cambios</button>
         </div>
     </div>
-
-    <script>
-        // --- VARIABLES GLOBALES PARA EL SERIAL Y SEPARACIÓN DE PRUEBAS ---
-        let port, reader, inputStreamClosed, keepReading = false;
-        let contadorTerminal = 1; 
-        let temporizadorInactividad; 
-        let nuevaPruebaLista = true; 
-
-        async function conectarPuerto() {
-            if (!("serial" in navigator)) {
-                alert("Tu navegador no soporta la Web Serial API. Usa Google Chrome o Edge.");
-                return;
-            }
-            try {
-                port = await navigator.serial.requestPort({ filters: [{ usbVendorId: 0x0403, usbProductId: 0x6001 }] });
-                await port.open({ baudRate: 115200 });
-                document.getElementById('lblEstado').textContent = "Conectado";
-                document.getElementById('lblEstado').className = "status connected";
-                document.getElementById('btnConectar').disabled = true;
-                document.getElementById('btnDesconectar').disabled = false;
-                
-                document.getElementById('terminal').textContent = ""; 
-                contadorTerminal = 1;
-                nuevaPruebaLista = true;
-                
-                keepReading = true;
-                leerDatos();
-            } catch (error) {
-                console.error(error);
-            }
-        }
-
-        async function leerDatos() {
+</body>
+</html>
